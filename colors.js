@@ -23,7 +23,7 @@ const getColor = (colorIndex) => {
             themeColor = "rgba(162, 162, 162, ?)";
     }
     return {
-        border: themeColor.replace("?", "0.5"),
+        border: themeColor.replace("?", "0.75"),
         background: themeColor.replace("?", "0.1"),
         active: themeColor.replace("?", "1")
     }

@@ -11,11 +11,14 @@
     <div id="overlays"></div>
     <canvas id="minimap" width="200" height="150"></canvas>
     <div id="controls">
-        <button id="toggle-collapse">‹</button>
+        <button id="toggle-collapse" class="square">‹</button>
         <div id="controls-content">
-            <button id="zoom-out">-</button>
+            <button id="toggle-fullscreen" class="square">⛶</button>
+        </div>
+        <div id="controls-content">
+            <button id="zoom-out" class="square">-</button>
             <input type="range" id="zoom-slider" min="-30" max="30" value="0">
-            <button id="zoom-in">+</button>
+            <button id="zoom-in" class="square">+</button>
             <button id="reset-view">Reset</button>
             <button id="toggle-minimap">Hide Minimap</button>
         </div>

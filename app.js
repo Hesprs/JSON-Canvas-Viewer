@@ -59,19 +59,30 @@ const minimapState = {
     }
 };
 
+let canvasBaseDir = './data/'; // Default base directory for related files
+
 // === Init ===
 async function initCanvas() {
     try {
-        canvasData = await fetch('./data/default.canvas').then(res => res.json());
+        const urlParams = new URLSearchParams(window.location.search);
+        const canvasPath = urlParams.get('path') ? decodeURIComponent(urlParams.get('path')) : 'example/introduction.canvas';
+        // Determine base directory for related files
+        if (/^https?:\/\//.test(canvasPath)) {
+            // Remote URL
+            canvasBaseDir = canvasPath.substring(0, canvasPath.lastIndexOf('/') + 1);
+        } else {
+            // Local or relative path
+            const lastSlash = canvasPath.lastIndexOf('/');
+            canvasBaseDir = lastSlash !== -1 ? canvasPath.substring(0, lastSlash + 1) : './';
+        }
+        canvasData = await fetch(canvasPath).then(res => res.json());
         canvasData.nodes.forEach(node => { nodeMap[node.id] = node; });
         buildSpatialGrid();
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         setInitialView();
         requestDraw();
-    } catch (err) {
-        console.error('Failed to load canvas data:', err);
-    }
+    } catch (err) { console.error('Failed to load canvas data:', err) }
 }
 
 function onCanvasMouseDown(e) {
@@ -96,7 +107,7 @@ function onCanvasMouseUp(e) {
                 worldCoords.y >= node.y && worldCoords.y <= node.y + node.height) {
                 if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {
                     const img = new Image();
-                    img.src = `./data/${node.file}`;
+                    img.src = canvasBaseDir + node.file;
                     img.className = 'canvas-preview-img';
                     const backdrop = document.createElement('div');
                     backdrop.className = 'canvas-preview-backdrop';
@@ -111,7 +122,7 @@ function onCanvasMouseUp(e) {
                 } else if (node.file.match(/\.mp3$/i)) {
                     const audio = document.createElement('audio');
                     audio.controls = true;
-                    audio.src = `./data/${node.file}`;
+                    audio.src = canvasBaseDir + node.file;
                     audio.style.width = '300px';
                     createPreviewModal(audio, 'audio');
                 }
@@ -194,6 +205,19 @@ const controlsPanel = document.getElementById('controls');
 const toggleCollapseBtn = document.getElementById('toggle-collapse');
 toggleCollapseBtn.addEventListener('click', () => { controlsPanel.classList.toggle('collapsed') });
 controlsPanel.addEventListener('mouseenter', stopDragging);
+
+// === Fullscreen ===
+const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
+function updateFullscreenButton() {
+    if (document.fullscreenElement === document.documentElement) toggleFullscreenBtn.textContent = '🡼';
+    else toggleFullscreenBtn.textContent = '⛶';
+}
+toggleFullscreenBtn.addEventListener('click', () => {
+    if (document.fullscreenElement !== document.documentElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+});
+document.addEventListener('fullscreenchange', updateFullscreenButton);
+updateFullscreenButton();
 
 // === Utility Functions ===
 function hashNodes(nodes) {
@@ -335,7 +359,10 @@ function drawFileNode(node) {
         drawNodeBackground(node);
         if (node.file.match(/\.mp3$/i)) {
             ctx.fillStyle = FONT_COLOR;
-            ctx.fillText('Click to preview 🎵', node.x + node.width / 2 - 60, node.y + node.height / 2 + 6);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Click to preview 🎵', node.x + node.width / 2, node.y + node.height / 2);
+            ctx.textAlign = 'left';
         }
     }
     ctx.fillStyle = FONT_COLOR;
@@ -352,7 +379,15 @@ function drawFileNode(node) {
                 ctx.save();
                 drawRoundRect(ctx, x, y, drawWidth, drawHeight, FILE_NODE_RADIUS);
                 ctx.clip();
-                ctx.drawImage(node.imageElement, x, y, drawWidth, drawHeight);
+                // Check for broken image
+                if (node.imageElement.naturalWidth === 0) {
+                    ctx.fillStyle = FONT_COLOR;
+                    ctx.font = '18px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('Image not found', x + drawWidth / 2, y + drawHeight / 2);
+                    ctx.textAlign = 'left';
+                } else ctx.drawImage(node.imageElement, x, y, drawWidth, drawHeight);
                 ctx.restore();
             }
         } else if (node.imageElement) node.imageElement = null;
@@ -382,8 +417,9 @@ function isNodeInViewport(node, margin = 200) {
 function loadImageForNode(node) {
     if (!imageCache[node.file]) {
         const img = new Image();
-        img.src = `./data/${node.file}`;
+        img.src = canvasBaseDir + node.file;
         img.onload = requestDraw;
+        img.onerror = requestDraw;
         imageCache[node.file] = img;
     }
     node.imageElement = imageCache[node.file];
@@ -393,7 +429,7 @@ async function loadMarkdownForNode(node) {
     if (!markdownCache[node.file]) {
         markdownCache[node.file] = { status: 'loading', content: null, frontmatter: null };
         try {
-            let result = await fetch(`./data/${node.file}`);
+            let result = await fetch(canvasBaseDir + node.file);
             result = await result.text();
             const frontmatterMatch = result.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
             if (frontmatterMatch) {
@@ -775,7 +811,16 @@ function screenToWorld(screenX, screenY) {
 function scaleToSlider(scale) { return Math.log(scale) / Math.log(1.1) }
 
 function updateScale(newScale) {
+    // Get the world coordinates at the center of the canvas before zoom
+    const centerScreenX = canvas.width / 2;
+    const centerScreenY = canvas.height / 2;
+    const worldCenterX = (centerScreenX - offsetX) / scale;
+    const worldCenterY = (centerScreenY - offsetY) / scale;
+    // Update scale
     scale = Math.max(0.05, Math.min(20, newScale));
+    // Adjust offset so the same world point stays at the center
+    offsetX = centerScreenX - worldCenterX * scale;
+    offsetY = centerScreenY - worldCenterY * scale;
     zoomSlider.value = scaleToSlider(scale);
     requestDraw();
 }
