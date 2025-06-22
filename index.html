@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta charset='utf-8'>
+	<meta name='viewport' content='width=device-width, initial-scale=1.0'>
+    <link rel='stylesheet' href='styles.css'>
+</head>
+<body>
+    <canvas id="myCanvas" width="1000" height="600"></canvas>
+    <div id="overlays"></div>
+    <canvas id="minimap" width="200" height="150"></canvas>
+    <div id="controls">
+        <button id="toggle-collapse">‹</button>
+        <div id="controls-content">
+            <button id="zoom-out">-</button>
+            <input type="range" id="zoom-slider" min="-30" max="30" value="0">
+            <button id="zoom-in">+</button>
+            <button id="reset-view">Reset</button>
+            <button id="toggle-minimap">Hide Minimap</button>
+        </div>
+    </div>
+    <script src="colors.js"></script>
+    <script src="marked.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

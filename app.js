@@ -1,0 +1,853 @@
+const nodeMap = {};
+const canvas = document.getElementById('myCanvas');
+const ctx = canvas.getContext('2d');
+const overlaysLayer = document.getElementById('overlays');
+const minimap = document.getElementById('minimap');
+const minimapCtx = minimap.getContext('2d');
+const linkIframes = {};
+const markdownDivs = {};
+const textDivs = {};
+
+let canvasData = null;
+let offsetX = canvas.width / 2;
+let offsetY = canvas.height / 2;
+let scale = 1.0;
+let isMinimapVisible = true;
+let drawScheduled = false;
+let lastMouseMove = 0;
+let lastWheel = 0;
+const THROTTLE_INTERVAL = 16; // ms
+let spatialGrid = null;
+const GRID_CELL_SIZE = 300;
+const FONT_COLOR = '#fff';
+
+// Overlay drag-to-pan logic
+const OVERLAY_DRAG_THRESHOLD = 5;
+
+// Markdown and image cache
+const markdownCache = {};
+const imageCache = {};
+
+// === Constants ===
+const ARROW_LENGTH = 12;
+const ARROW_WIDTH = 7;
+const FILE_NODE_RADIUS = 12;
+
+// === Grouped State Objects ===
+const dragState = {
+    isDragging: false,
+    lastX: 0,
+    lastY: 0,
+    lastClientX: 0,
+    lastClientY: 0,
+    isOverlayMouseDown: false,
+    overlayMouseDownX: 0,
+    overlayMouseDownY: 0,
+    overlayDragStarted: false
+};
+const overlayState = {
+    selectedOverlayId: null,
+    isHoveringSelectedOverlay: false
+};
+const minimapState = {
+    isMinimapVisible: true,
+    lastMinimapState: {
+        nodesHash: '',
+        offsetX: null,
+        offsetY: null,
+        scale: null
+    }
+};
+
+// === Init ===
+async function initCanvas() {
+    try {
+        canvasData = await fetch('./data/default.canvas').then(res => res.json());
+        canvasData.nodes.forEach(node => { nodeMap[node.id] = node; });
+        buildSpatialGrid();
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        setInitialView();
+        requestDraw();
+    } catch (err) {
+        console.error('Failed to load canvas data:', err);
+    }
+}
+
+function onCanvasMouseDown(e) {
+    dragState.isDragging = true;
+    dragState.lastX = e.offsetX;
+    dragState.lastY = e.offsetY;
+    dragState.lastClientX = e.clientX;
+    dragState.lastClientY = e.clientY;
+}
+
+function onCanvasMouseUp(e) {
+    if ((dragState.lastClientX - dragState.lastX) ** 2 + (dragState.lastClientY - dragState.lastY) ** 2 < 25) {
+        if (e.target === canvas) {
+            overlayState.selectedOverlayId = null;
+            updateAllOverlays();
+        }
+        const worldCoords = screenToWorld(e.offsetX, e.offsetY);
+        const candidates = getNodesAt(worldCoords.x, worldCoords.y);
+        for (let node of candidates) {
+            if (node.type !== 'file') continue;
+            if (worldCoords.x >= node.x && worldCoords.x <= node.x + node.width &&
+                worldCoords.y >= node.y && worldCoords.y <= node.y + node.height) {
+                if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {
+                    const img = new Image();
+                    img.src = `./data/${node.file}`;
+                    img.className = 'canvas-preview-img';
+                    const backdrop = document.createElement('div');
+                    backdrop.className = 'canvas-preview-backdrop';
+                    const closePreview = () => {
+                        document.body.removeChild(img);
+                        document.body.removeChild(backdrop);
+                    };
+                    img.onclick = closePreview;
+                    backdrop.onclick = closePreview;
+                    document.body.appendChild(backdrop);
+                    document.body.appendChild(img);
+                } else if (node.file.match(/\.mp3$/i)) {
+                    const audio = document.createElement('audio');
+                    audio.controls = true;
+                    audio.src = `./data/${node.file}`;
+                    audio.style.width = '300px';
+                    createPreviewModal(audio, 'audio');
+                }
+                break;
+            }
+        }
+    }
+    dragState.isOverlayMouseDown = false;
+    dragState.overlayDragStarted = false;
+    dragState.isDragging = false;
+}
+
+function onCanvasMouseMove(e) {
+    if (!dragState.isDragging) return;
+    const now = performance.now();
+    if (now - lastMouseMove < THROTTLE_INTERVAL) return;
+    lastMouseMove = now;
+    const dx = e.clientX - dragState.lastClientX;
+    const dy = e.clientY - dragState.lastClientY;
+    offsetX += dx;
+    offsetY += dy;
+    dragState.lastClientX = e.clientX;
+    dragState.lastClientY = e.clientY;
+    requestDraw();
+}
+
+function onWindowWheel(e) {
+    if (overlayState.isHoveringSelectedOverlay) return;
+    const now = performance.now();
+    if (now - lastWheel < THROTTLE_INTERVAL) return;
+    lastWheel = now;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const worldX = (mouseX - offsetX) / scale;
+    const worldY = (mouseY - offsetY) / scale;
+    e.preventDefault();
+    const zoomFactor = 1.03;
+    let newScale = scale;
+    if (e.deltaY < 0) newScale *= zoomFactor;
+    else newScale /= zoomFactor;
+    newScale = Math.max(0.05, Math.min(20, newScale));
+    offsetX = mouseX - worldX * newScale;
+    offsetY = mouseY - worldY * newScale;
+    scale = newScale;
+    zoomSlider.value = scaleToSlider(scale);
+    requestDraw();
+}
+
+function onWindowResize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    requestDraw();
+}
+
+canvas.addEventListener('mousedown', onCanvasMouseDown);
+canvas.addEventListener('mouseup', onCanvasMouseUp);
+canvas.addEventListener('mousemove', onCanvasMouseMove);
+canvas.addEventListener('touchstart', (e) => onCanvasMouseDown(e.touches[0]), { passive: true });
+canvas.addEventListener('touchend', (e) => onCanvasMouseUp(e.touches[0]), { passive: true });
+canvas.addEventListener('touchmove', (e) => onCanvasMouseMove(e.touches[0]), { passive: true });
+window.addEventListener('wheel', onWindowWheel, { passive: false });
+window.addEventListener('resize', onWindowResize);
+window.addEventListener('mouseleave', stopDragging);
+document.addEventListener('mouseout', function(e) { if (!e.relatedTarget) stopDragging() });
+initCanvas();
+const zoomSlider = document.getElementById('zoom-slider');
+const minimapCanvas = document.getElementById('minimap');
+const toggleMinimapBtn = document.getElementById('toggle-minimap');
+document.getElementById('zoom-in').addEventListener('click', () => updateScale(scale * 1.2));
+document.getElementById('zoom-out').addEventListener('click', () => updateScale(scale / 1.2));
+zoomSlider.addEventListener('input', (e) => updateScale(Math.pow(1.1, e.target.value)));
+document.getElementById('reset-view').addEventListener('click', setInitialView);
+toggleMinimapBtn.addEventListener('click', () => {
+    minimapState.isMinimapVisible = !minimapState.isMinimapVisible;
+    minimapCanvas.style.display = minimapState.isMinimapVisible ? 'block' : 'none';
+    toggleMinimapBtn.textContent = minimapState.isMinimapVisible ? 'Hide Minimap' : 'Show Minimap';
+});
+const controlsPanel = document.getElementById('controls');
+const toggleCollapseBtn = document.getElementById('toggle-collapse');
+toggleCollapseBtn.addEventListener('click', () => { controlsPanel.classList.toggle('collapsed') });
+controlsPanel.addEventListener('mouseenter', stopDragging);
+
+// === Utility Functions ===
+function hashNodes(nodes) {
+    let hash = 0;
+    for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        hash += n.x + n.y + n.width + n.height;
+    }
+    return hash;
+}
+
+function stopDragging () {
+    dragState.isDragging = false;
+    dragState.isOverlayMouseDown = false;
+}
+
+function buildSpatialGrid() {
+    if (!canvasData || canvasData.nodes.length < 200) {
+        spatialGrid = null;
+        return;
+    }
+    spatialGrid = {};
+    for (let node of canvasData.nodes) {
+        const minCol = Math.floor(node.x / GRID_CELL_SIZE);
+        const maxCol = Math.floor((node.x + node.width) / GRID_CELL_SIZE);
+        const minRow = Math.floor(node.y / GRID_CELL_SIZE);
+        const maxRow = Math.floor((node.y + node.height) / GRID_CELL_SIZE);
+        for (let col = minCol; col <= maxCol; col++) {
+            for (let row = minRow; row <= maxRow; row++) {
+                const key = `${col},${row}`;
+                if (!spatialGrid[key]) spatialGrid[key] = [];
+                spatialGrid[key].push(node);
+            }
+        }
+    }
+}
+
+function getNodesAt(x, y) {
+    if (!spatialGrid) return canvasData.nodes;
+    const col = Math.floor(x / GRID_CELL_SIZE);
+    const row = Math.floor(y / GRID_CELL_SIZE);
+    const key = `${col},${row}`;
+    return spatialGrid[key] || [];
+}
+
+// === Draw ===
+function requestDraw() {
+    if (!drawScheduled) {
+        drawScheduled = true;
+        requestAnimationFrame(() => {
+            overlaysLayer.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#222';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(offsetX, offsetY);
+            ctx.scale(scale, scale);
+            // Cache viewport status for all nodes
+            canvasData.nodes.forEach(node => node._inViewport = isNodeInViewport(node));
+            canvasData.nodes.forEach(node => {
+                switch (node.type) {
+                    case 'group': drawGroup(node); break;
+                    case 'file': drawFileNode(node); break;
+                }
+            });
+            canvasData.edges.forEach(drawEdge);
+            ctx.restore();
+            updateAllOverlays();
+            drawMinimap();
+            drawScheduled = false;
+        });
+    }
+}
+
+function drawLabelBar(x, y, label, colors) {
+    const barHeight = 30 * scale;
+    const radius = 6 * scale;
+    const yOffset = 8 * scale;
+    const fontSize = 16 * scale;
+    const xPadding = 6 * scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1/scale, 1/scale);
+    ctx.font = `${fontSize}px 'Inter', sans-serif`;
+    const barWidth = ctx.measureText(label).width + 2 * xPadding;
+    ctx.translate(0, -barHeight - yOffset);
+    ctx.fillStyle = colors.border;
+    ctx.beginPath();
+    ctx.moveTo(radius, 0);
+    ctx.lineTo(barWidth - radius, 0);
+    ctx.quadraticCurveTo(barWidth, 0, barWidth, radius);
+    ctx.lineTo(barWidth, barHeight - radius);
+    ctx.quadraticCurveTo(barWidth, barHeight, barWidth - radius, barHeight);
+    ctx.lineTo(radius, barHeight);
+    ctx.quadraticCurveTo(0, barHeight, 0, barHeight - radius);
+    ctx.lineTo(0, radius);
+    ctx.quadraticCurveTo(0, 0, radius, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = FONT_COLOR;
+    ctx.fillText(label, xPadding, barHeight * 0.65);
+    ctx.restore();
+}
+
+function drawRoundRect(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+}
+
+function drawNodeBackground(node) {
+    const colors = getColor(node.color);
+    const radius = FILE_NODE_RADIUS;
+    ctx.globalAlpha = 1.0;
+    ctx.fillStyle = colors.background;
+    drawRoundRect(ctx, node.x + 1, node.y + 1, node.width - 2, node.height - 2, radius);
+    ctx.fill();
+    ctx.strokeStyle = colors.border;
+    ctx.lineWidth = 2;
+    drawRoundRect(ctx, node.x, node.y, node.width, node.height, radius);
+    ctx.stroke();
+}
+
+function drawGroup(node) {
+    drawNodeBackground(node);
+    if (node.label) drawLabelBar(node.x, node.y, node.label, getColor(node.color));
+}
+
+function drawFileNode(node) {
+    if (!node.file.match(/\.md$/i)) {
+        drawNodeBackground(node);
+        if (node.file.match(/\.mp3$/i)) {
+            ctx.fillStyle = FONT_COLOR;
+            ctx.fillText('Click to preview 🎵', node.x + node.width / 2 - 60, node.y + node.height / 2 + 6);
+        }
+    }
+    ctx.fillStyle = FONT_COLOR;
+    ctx.font = '16px sans-serif';
+    ctx.fillText(node.file, node.x + 5, node.y - 10);
+    if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {
+        if (node._inViewport) {
+            loadImageForNode(node);
+            if (node.imageElement && node.imageElement.complete) {
+                const x = node.x + 1;
+                const y = node.y + 1;
+                const drawWidth = node.width - 2;
+                const drawHeight = node.height - 2;
+                ctx.save();
+                drawRoundRect(ctx, x, y, drawWidth, drawHeight, FILE_NODE_RADIUS);
+                ctx.clip();
+                ctx.drawImage(node.imageElement, x, y, drawWidth, drawHeight);
+                ctx.restore();
+            }
+        } else if (node.imageElement) node.imageElement = null;
+    } else if (node.file.match(/\.md$/i)) {
+        if (node._inViewport) loadMarkdownForNode(node);
+        else if (node.mdContent) {
+            node.mdContent = null;
+            node.mdFrontmatter = null;
+        }
+    }
+}
+
+function isNodeInViewport(node, margin = 200) {
+    const viewLeft = (-offsetX) / scale - margin;
+    const viewTop = (-offsetY) / scale - margin;
+    const viewRight = viewLeft + canvas.width / scale + 2 * margin;
+    const viewBottom = viewTop + canvas.height / scale + 2 * margin;
+    return (
+        node.x + node.width > viewLeft &&
+        node.x < viewRight &&
+        node.y + node.height > viewTop &&
+        node.y < viewBottom
+    );
+}
+
+// === Lazy Loading Utilities ===
+function loadImageForNode(node) {
+    if (!imageCache[node.file]) {
+        const img = new Image();
+        img.src = `./data/${node.file}`;
+        img.onload = requestDraw;
+        imageCache[node.file] = img;
+    }
+    node.imageElement = imageCache[node.file];
+}
+
+async function loadMarkdownForNode(node) {
+    if (!markdownCache[node.file]) {
+        markdownCache[node.file] = { status: 'loading', content: null, frontmatter: null };
+        try {
+            let result = await fetch(`./data/${node.file}`);
+            result = await result.text();
+            const frontmatterMatch = result.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+            if (frontmatterMatch) {
+                const frontmatter = frontmatterMatch[1].split('\n').reduce((acc, line) => {
+                    const [key, value] = line.split(':').map(s => s.trim());
+                    acc[key] = value;
+                    return acc;
+                }, {});
+                markdownCache[node.file] = { status: 'loaded', content: frontmatterMatch[2].trim(), frontmatter };
+            } else markdownCache[node.file] = { status: 'loaded', content: result, frontmatter: null };
+        } catch(err) {
+            console.error('Failed to load markdown:', err);
+            markdownCache[node.file] = { status: 'error', content: 'Failed to load content', frontmatter: null };
+        }
+    }
+    if (markdownCache[node.file].status === 'loaded') {
+        node.mdContent = markdownCache[node.file].content;
+        node.mdFrontmatter = markdownCache[node.file].frontmatter;
+    } else if (markdownCache[node.file].status === 'error') {
+        node.mdContent = markdownCache[node.file].content;
+        node.mdFrontmatter = null;
+    } else {
+        node.mdContent = 'Loading...';
+        node.mdFrontmatter = null;
+    }
+    updateAllOverlays();
+}
+
+function updateAllOverlays() {
+    const neededText = new Set();
+    const neededMarkdown = new Set();
+    const overlayCreators = {
+        text: (node) => {
+            if (node._inViewport) {
+                neededText.add(node.id);
+                updateOrCreateOverlay(node, textDivs, node.text, 'text');
+            }
+        },
+        file: (node) => {
+            if (node.file.match(/\.md$/i) && node.mdContent) {
+                neededMarkdown.add(node.id);
+                updateOrCreateOverlay(node, markdownDivs, node.mdContent, 'markdown');
+            }
+        },
+        link: (node) => { updateOrCreateOverlay(node, linkIframes, node.url, 'link') }
+    };
+    canvasData.nodes.forEach(node => {
+        if (overlayCreators[node.type]) overlayCreators[node.type](node);
+    });
+    Object.keys(textDivs).forEach(id => {
+        if (!neededText.has(id)) {
+            const div = textDivs[id];
+            if (div && div.parentNode) div.parentNode.removeChild(div);
+            delete textDivs[id];
+        }
+    });
+    Object.keys(markdownDivs).forEach(id => {
+        if (!neededMarkdown.has(id)) {
+            const div = markdownDivs[id];
+            if (div && div.parentNode) div.parentNode.removeChild(div);
+            delete markdownDivs[id];
+        }
+    });
+}
+
+function createOverlayElement(type, node) {
+    let element;
+    if (type === 'text' || type === 'markdown') {
+        element = document.createElement('div');
+        element.className = 'markdown-content';
+    } else if (type === 'link') {
+        element = document.createElement('div');
+        element.className = 'link-overlay-container';
+        const iframe = document.createElement('iframe');
+        iframe.src = node.url;
+        iframe.sandbox = 'allow-scripts allow-same-origin';
+        iframe.className = 'link-iframe';
+        const clickLayer = document.createElement('div');
+        clickLayer.className = 'link-click-layer';
+        clickLayer.addEventListener('mouseup', (e) => {
+            if (e.button !== 0) return;
+            if (dragState.isOverlayMouseDown) return;
+            overlayState.selectedOverlayId = node.id;
+            updateAllOverlays();
+            overlayState.isHoveringSelectedOverlay = true;
+            e.stopPropagation();
+        });
+        element.appendChild(iframe);
+        element.appendChild(clickLayer);
+        element._iframe = iframe;
+        element._clickLayer = clickLayer;
+    }
+    return element;
+}
+
+function updateOrCreateOverlay(node, divMap, content, type) {
+    let element = divMap[node.id];
+    if (!element) {
+        element = createOverlayElement(type, node);
+        overlaysLayer.appendChild(element);
+        divMap[node.id] = element;
+        attachOverlayEventListeners(element, node);
+    }
+    element.style.left = node.x + 'px';
+    element.style.top = node.y + 'px';
+    element.style.width = node.width + 'px';
+    element.style.height = node.height + 'px';
+    element.style.pointerEvents = 'auto';
+    if (type === 'markdown' || type === 'text') {
+        if (element.originalContent == undefined || element.originalContent !== content) { 
+            element.originalContent = content;
+            const parsedContentWrapper = document.createElement('div');
+            parsedContentWrapper.innerHTML = window.marked.parse(content || '');
+            parsedContentWrapper.classList.add('parsed-content-wrapper');
+            element.innerHTML = '';
+            element.appendChild(parsedContentWrapper);
+        }
+    }
+    if (type === 'markdown' || type === 'text') {
+        if (node.mdFrontmatter?.direction === 'rtl') element.classList.add('rtl');
+        else element.classList.remove('rtl');
+        element.style.color = FONT_COLOR;
+    }
+    if (overlayState.selectedOverlayId === node.id) element.classList.add('active');
+    else element.classList.remove('active');
+    element.style.backgroundColor = getColor(node.color).background;
+    if (overlayState.selectedOverlayId === node.id) {
+        element.style.borderColor = getColor(node.color).active;
+        if (!element._hasHoverListeners) {
+            element._mouseenterHandler = () => { if (overlayState.selectedOverlayId === node.id) overlayState.isHoveringSelectedOverlay = true; };
+            element._mouseleaveHandler = () => { if (overlayState.selectedOverlayId === node.id) overlayState.isHoveringSelectedOverlay = false; };
+            element.addEventListener('mouseenter', element._mouseenterHandler);
+            element.addEventListener('mouseleave', element._mouseleaveHandler);
+            element._hasHoverListeners = true;
+        }
+    } else {
+        element.style.borderColor = getColor(node.color).border;
+        if (element._hasHoverListeners) {
+            element.removeEventListener('mouseenter', element._mouseenterHandler);
+            element.removeEventListener('mouseleave', element._mouseleaveHandler);
+            element._hasHoverListeners = false;
+        }
+    }
+}
+
+function drawEdge(edge) {
+    const { fromNode, toNode } = getEdgeNodes(edge);
+    if (!fromNode || !toNode) return;
+    const [startX, startY] = getAnchorCoord(fromNode, edge.fromSide);
+    const [endX, endY] = getAnchorCoord(toNode, edge.toSide);
+    const [startControlX, startControlY, endControlX, endControlY] = getControlPoints(
+        startX, startY, endX, endY, 
+        edge.fromSide, edge.toSide
+    );
+    drawCurvedPath(startX, startY, endX, endY, startControlX, startControlY, endControlX, endControlY);
+    drawArrowhead(endX, endY, endControlX, endControlY);
+    if (edge.label) {
+        const t = 0.5; 
+        const x = Math.pow(1-t,3)*startX + 3*Math.pow(1-t,2)*t*startControlX + 3*(1-t)*t*t*endControlX + Math.pow(t,3)*endX;
+        const y = Math.pow(1-t,3)*startY + 3*Math.pow(1-t,2)*t*startControlY + 3*(1-t)*t*t*endControlY + Math.pow(t,3)*endY;
+        ctx.font = '18px sans-serif';
+        const metrics = ctx.measureText(edge.label);
+        const padding = 8;
+        const labelWidth = metrics.width + (padding * 2);
+        const labelHeight = 20;
+        ctx.fillStyle = '#222';
+        ctx.beginPath();
+        ctx.roundRect(
+            x - labelWidth/2,
+            y - labelHeight/2 - 2,
+            labelWidth,
+            labelHeight,
+            4
+        );
+        ctx.fill();
+        ctx.fillStyle = '#ccc';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(edge.label, x, y - 2);
+        ctx.textAlign = 'left'; 
+        ctx.textBaseline = 'alphabetic'; 
+    }
+}
+
+function getEdgeNodes(edge) {
+    return {
+        fromNode: nodeMap[edge.fromNode],
+        toNode: nodeMap[edge.toNode]
+    };
+}
+
+function getControlPoints(startX, startY, endX, endY, fromSide, toSide) {
+    const distance = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
+    const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+    const PADDING = clamp(distance * 0.3, 60, 300);
+    let startControlX = startX;
+    let startControlY = startY;
+    let endControlX = endX;
+    let endControlY = endY;
+    switch (fromSide) {
+        case 'top': startControlY = startY - PADDING; break;
+        case 'bottom': startControlY = startY + PADDING; break;
+        case 'left': startControlX = startX - PADDING; break;
+        case 'right': startControlX = startX + PADDING; break;
+    }
+    switch (toSide) {
+        case 'top': endControlY = endY - PADDING; break;
+        case 'bottom': endControlY = endY + PADDING; break;
+        case 'left': endControlX = endX - PADDING; break;
+        case 'right': endControlX = endX + PADDING; break;
+    }
+    return [startControlX, startControlY, endControlX, endControlY];
+}
+
+function drawCurvedPath(startX, startY, endX, endY, c1x, c1y, c2x, c2y) {
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.bezierCurveTo(c1x, c1y, c2x, c2y, endX, endY);
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+}
+
+function getAnchorCoord(node, side) {
+    const midX = node.x + node.width / 2;
+    const midY = node.y + node.height / 2;
+    switch (side) {
+        case 'top': return [midX, node.y];
+        case 'bottom': return [midX, node.y + node.height];
+        case 'left': return [node.x, midY];
+        case 'right': return [node.x + node.width, midY];
+        default: return [midX, midY];
+    }
+}
+
+function drawArrowhead(tipX, tipY, fromX, fromY) {
+    const dx = tipX - fromX;
+    const dy = tipY - fromY;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    if (length === 0) return;
+    const unitX = dx / length;
+    const unitY = dy / length;
+    const leftX = tipX - unitX * ARROW_LENGTH - unitY * ARROW_WIDTH;
+    const leftY = tipY - unitY * ARROW_LENGTH + unitX * ARROW_WIDTH;
+    const rightX = tipX - unitX * ARROW_LENGTH + unitY * ARROW_WIDTH;
+    const rightY = tipY - unitY * ARROW_LENGTH - unitX * ARROW_WIDTH;    
+    ctx.beginPath();
+    ctx.fillStyle = '#ccc';
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(leftX, leftY);
+    ctx.lineTo(rightX, rightY);
+    ctx.closePath();
+    ctx.fill();
+}
+
+function drawMinimap() {
+    if (!isMinimapVisible) return;
+    // Compute hash/state
+    const nodesHash = canvasData && canvasData.nodes ? hashNodes(canvasData.nodes) : '';
+    if (
+        minimapState.lastMinimapState.nodesHash === nodesHash &&
+        minimapState.lastMinimapState.offsetX === offsetX &&
+        minimapState.lastMinimapState.offsetY === offsetY &&
+        minimapState.lastMinimapState.scale === scale
+    ) return;
+    minimapState.lastMinimapState.nodesHash = nodesHash;
+    minimapState.lastMinimapState.offsetX = offsetX;
+    minimapState.lastMinimapState.offsetY = offsetY;
+    minimapState.lastMinimapState.scale = scale;
+    minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
+    minimapCtx.fillStyle = '#333';
+    minimapCtx.fillRect(0, 0, minimap.width, minimap.height);
+    minimapCtx.save();    
+    const bounds = calculateNodesBounds();
+    if (!bounds) return;
+    const contentWidth = bounds.maxX - bounds.minX;
+    const contentHeight = bounds.maxY - bounds.minY;
+    const scaleX = minimap.width / contentWidth;
+    const scaleY = minimap.height / contentHeight;
+    const minimapScale = Math.min(scaleX, scaleY) * 0.9;     
+    const centerX = minimap.width / 2;
+    const centerY = minimap.height / 2;
+    minimapCtx.translate(centerX, centerY);
+    minimapCtx.scale(minimapScale, minimapScale);
+    minimapCtx.translate(-(bounds.minX + contentWidth / 2), -(bounds.minY + contentHeight / 2));
+    for (let edge of canvasData.edges) drawMinimapEdge(edge);
+    for (let node of canvasData.nodes) drawMinimapNode(node);
+    minimapCtx.restore();
+    drawViewportRect(bounds, minimapScale);
+}
+
+function calculateNodesBounds() {
+    if (!canvasData || !canvasData.nodes.length) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    canvasData.nodes.forEach(node => {
+        minX = Math.min(minX, node.x);
+        minY = Math.min(minY, node.y);
+        maxX = Math.max(maxX, node.x + node.width);
+        maxY = Math.max(maxY, node.y + node.height);
+    });
+    return { minX, minY, maxX, maxY };
+}
+
+function drawMinimapNode(node) {
+    const colors = getColor(node.color);
+    const radius = 25;
+    minimapCtx.fillStyle = colors.border;
+    minimapCtx.globalAlpha = 0.3;
+    drawRoundRect(minimapCtx, node.x, node.y, node.width, node.height, radius);
+    minimapCtx.fill();
+    minimapCtx.globalAlpha = 1.0;
+}
+
+function drawMinimapEdge(edge) {
+    const fromNode = nodeMap[edge.fromNode];
+    const toNode = nodeMap[edge.toNode];
+    if (!fromNode || !toNode) return;
+    const [startX, startY] = getAnchorCoord(fromNode, edge.fromSide);
+    const [endX, endY] = getAnchorCoord(toNode, edge.toSide);
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(startX, startY);
+    minimapCtx.lineTo(endX, endY);
+    minimapCtx.strokeStyle = '#555';
+    minimapCtx.lineWidth = 10;
+    minimapCtx.stroke();
+}
+
+function drawViewportRect(bounds, minimapScale) {
+    const contentWidth = bounds.maxX - bounds.minX;
+    const contentHeight = bounds.maxY - bounds.minY;
+    const viewportCenterX = -offsetX / scale + canvas.width / (2 * scale);
+    const viewportCenterY = -offsetY / scale + canvas.height / (2 * scale);
+    const viewWidth = canvas.width / scale;
+    const viewHeight = canvas.height / scale;
+    minimapCtx.save();
+    minimapCtx.resetTransform();
+    const centerX = minimap.width / 2;
+    const centerY = minimap.height / 2;
+    const viewRectX = centerX + (viewportCenterX - viewWidth/2 - (bounds.minX + contentWidth/2)) * minimapScale;
+    const viewRectY = centerY + (viewportCenterY - viewHeight/2 - (bounds.minY + contentHeight/2)) * minimapScale;
+    const viewRectWidth = viewWidth * minimapScale;
+    const viewRectHeight = viewHeight * minimapScale;
+    minimapCtx.strokeStyle = '#fff';
+    minimapCtx.lineWidth = 2;
+    minimapCtx.strokeRect(viewRectX, viewRectY, viewRectWidth, viewRectHeight);
+    minimapCtx.restore();
+}
+
+function setInitialView() {
+    const bounds = calculateNodesBounds();
+    if (!bounds) return { scale: 1.0, offsetX: canvas.width / 2, offsetY: canvas.height / 2 };
+    const PADDING = 50;
+    const contentWidth = bounds.maxX - bounds.minX + (PADDING * 2);
+    const contentHeight = bounds.maxY - bounds.minY + (PADDING * 2);
+    const scaleX = canvas.width / contentWidth;
+    const scaleY = canvas.height / contentHeight;
+    const newScale = Math.min(scaleX, scaleY);
+    const contentCenterX = bounds.minX + (bounds.maxX - bounds.minX) / 2;
+    const contentCenterY = bounds.minY + (bounds.maxY - bounds.minY) / 2;
+    const initialView = {
+        scale: newScale,
+        offsetX: canvas.width/2 - contentCenterX * newScale,
+        offsetY: canvas.height/2 - contentCenterY * newScale
+    };
+    scale = initialView.scale;
+    offsetX = initialView.offsetX;
+    offsetY = initialView.offsetY;
+    zoomSlider.value = scaleToSlider(scale);
+    requestDraw();
+}
+
+function screenToWorld(screenX, screenY) {
+    return {
+        x: (screenX - offsetX) / scale,
+        y: (screenY - offsetY) / scale
+    };
+}
+
+function scaleToSlider(scale) { return Math.log(scale) / Math.log(1.1) }
+
+function updateScale(newScale) {
+    scale = Math.max(0.05, Math.min(20, newScale));
+    zoomSlider.value = scaleToSlider(scale);
+    requestDraw();
+}
+
+function createPreviewModal(content, type) {
+    const modal = document.createElement('div');
+    modal.className = 'canvas-preview-modal';
+    const backdrop = document.createElement('div');
+    backdrop.className = 'canvas-preview-backdrop';
+    const closeButton = document.createElement('button');
+    closeButton.className = 'canvas-preview-close';
+    closeButton.textContent = '×';
+    modal.appendChild(closeButton);
+    if (type === 'audio') modal.appendChild(content);
+    else if (type === 'markdown') {
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'canvas-preview-content';
+        contentDiv.innerHTML = content;
+        modal.appendChild(contentDiv);
+    }
+    const closeModal = () => {
+        document.body.removeChild(modal);
+        document.body.removeChild(backdrop);
+    };
+    closeButton.onclick = closeModal;
+    backdrop.onclick = closeModal;
+    document.body.appendChild(backdrop);
+    document.body.appendChild(modal);
+}
+
+function handleOverlayMousedown(e) {
+    if (overlayState.isHoveringSelectedOverlay) return;
+    Object.assign(dragState, {
+        isOverlayMouseDown: true,
+        overlayMouseDownX: e.clientX,
+        overlayMouseDownY: e.clientY,
+        overlayDragStarted: false,
+        lastClientX: e.clientX,
+        lastClientY: e.clientY
+    });
+}
+
+function handleOverlayMousemove(e) {
+    if (!dragState.isOverlayMouseDown) return;
+    const dx = e.clientX - dragState.overlayMouseDownX;
+    const dy = e.clientY - dragState.overlayMouseDownY;
+    if (!dragState.overlayDragStarted && (Math.abs(dx) > OVERLAY_DRAG_THRESHOLD || Math.abs(dy) > OVERLAY_DRAG_THRESHOLD)) {
+        dragState.isDragging = dragState.overlayDragStarted = true;
+    }
+    if (!dragState.overlayDragStarted) return;
+    offsetX += e.clientX - dragState.lastClientX;
+    offsetY += e.clientY - dragState.lastClientY;
+    dragState.lastClientX = e.clientX;
+    dragState.lastClientY = e.clientY;
+    requestDraw();
+}
+
+function handleOverlayMouseup(node) {
+    if (!dragState.isOverlayMouseDown) return;
+    if (!dragState.overlayDragStarted) {
+        overlayState.selectedOverlayId = node.id;
+        updateAllOverlays();
+        overlayState.isHoveringSelectedOverlay = true;
+    }
+    dragState.isOverlayMouseDown = dragState.overlayDragStarted = dragState.isDragging = false;
+}
+
+function attachOverlayEventListeners(element, node) {
+    element.addEventListener('mousedown', handleOverlayMousedown);
+    element.addEventListener('mousemove', handleOverlayMousemove);
+    element.addEventListener('mouseup', () => handleOverlayMouseup(node));
+    element.addEventListener('touchstart', (e) => handleOverlayMousedown(e.touches[0]), { passive: true });
+    element.addEventListener('touchend', () => handleOverlayMouseup(node), { passive: true });
+    element.addEventListener('touchmove', (e) => handleOverlayMousemove(e.touches[0]), { passive: true });
+}
