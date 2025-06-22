@@ -79,30 +79,30 @@ The viewer expects Obsidian Canvas files in JSON format with the following struc
 
 ``` JSON
 {
-  "nodes": [
-    {
-      "id": "unique-id",
-      "type": "text|file|link|group",
-      "x": 0,
-      "y": 0,
-      "width": 400,
-      "height": 400,
-      "text": "Content for text nodes",
-      "file": "filename for file nodes",
-      "url": "URL for link nodes",
-      "color": "color-id for groups"
-    }
-  ],
-  "edges": [
-    {
-      "id": "edge-id",
-      "fromNode": "source-node-id",
-      "toNode": "target-node-id",
-      "fromSide": "top|bottom|left|right",
-      "toSide": "top|bottom|left|right",
-      "label": "Optional edge label"
-    }
-  ]
+    "nodes": [
+        {
+            "id": "unique-id",
+            "type": "text|file|link|group",
+            "x": 0,
+            "y": 0,
+            "width": 400,
+            "height": 400,
+            "text": "Content for text nodes",
+            "file": "filename for file nodes",
+            "url": "URL for link nodes",
+            "color": "color-id for groups"
+        }
+    ],
+    "edges": [
+        {
+            "id": "edge-id",
+            "fromNode": "source-node-id",
+            "toNode": "target-node-id",
+            "fromSide": "top|bottom|left|right",
+            "toSide": "top|bottom|left|right",
+            "label": "Optional edge label"
+        }
+    ]
 }
 ```
 
