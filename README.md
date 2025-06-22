@@ -80,7 +80,7 @@ The viewer expects Obsidian Canvas files in JSON format with the following struc
 ``` JSON
 {
     "nodes": [
-        {
+        {
             "id": "unique-id",
             "type": "text|file|link|group",
             "x": 0,
