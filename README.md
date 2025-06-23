@@ -1,6 +1,6 @@
 # Obsidian Canvas Web Renderer X Version 1.1.1
 
-A **web-based** viewer for **Obsidian Canvas** files that allows you to view and interact with your canvas files directly in the browser. Using this tool, you can embed interactive canvas to your front-end projects with ease.
+A **web-based** viewer for **Obsidian Canvas** files that allows you to view and interact with your canvas files directly in the browser. Using this tool, you can embed interactive canvas to your front-end projects with ease. See **demo** at https://hesprs.github.io/canvas_demo.
 
 ![App interface](https://img1.tucang.cc/api/image/show/72e975b6d6cbd6436300b3d86fe26f91)
 
