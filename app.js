@@ -9,6 +9,7 @@ const markdownDivs = {};
 const textDivs = {};
 
 let canvasData = null;
+let canvasBaseDir = null;
 let offsetX = canvas.width / 2;
 let offsetY = canvas.height / 2;
 let scale = 1.0;
@@ -58,8 +59,6 @@ const minimapState = {
         scale: null
     }
 };
-
-let canvasBaseDir = './data/'; // Default base directory for related files
 
 // === Init ===
 async function initCanvas() {

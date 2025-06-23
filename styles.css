@@ -206,12 +206,12 @@ p {
     width: 100%;
     border-radius: 5px;
 }
-h1 { font-size: 27px }
-h2 { font-size: 25px }
-h3 { font-size: 24px }
-h4 { font-size: 22px }
-h5 { font-size: 21px }
-h6 { font-size: 19px }
+h1 { font-size: 26px }
+h2 { font-size: 24px }
+h3 { font-size: 23px }
+h4 { font-size: 21px }
+h5 { font-size: 20px }
+h6 { font-size: 18px }
 p, h1, h2, h3, h4, h5, h6, ol, ul { margin: 0 }
 h1, h2 { font-weight: 800 }
 h3, h4 { font-weight: 700 }

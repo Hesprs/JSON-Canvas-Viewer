@@ -107,8 +107,8 @@
 			"height":60,
 			"color":"3"
 		},
-		{"id":"9af2da6b89c5f2a1","type":"file","file":"Switching from Windows to MacOS as a developer.md","x":780,"y":60,"width":400,"height":400,"color":"3"},
-		{"id":"da1aafa04f0b673e","type":"file","file":"الانتقال من Windows إلى MacOS كمطور.md","x":340,"y":60,"width":400,"height":400,"color":"4"},
+		{"id":"9af2da6b89c5f2a1","type":"file","file":"Switching from Windows to macOS.md","x":780,"y":60,"width":400,"height":400,"color":"3"},
+		{"id":"da1aafa04f0b673e","type":"file","file":"الانتقال من Windows إلى macOS.md","x":340,"y":60,"width":400,"height":400,"color":"4"},
 		{"id":"625743fbee36d661","type":"file","file":"Exotic Arabian Song.mp3","x":340,"y":-21,"width":840,"height":42},
 		{"id":"b34d760cc01dd4a1","type":"file","file":"Initial Creator.png","x":1700,"y":-820,"width":708,"height":380},
 		{
@@ -124,7 +124,7 @@
 		{
 			"id":"146e664c06b00276",
 			"type":"text",
-			"text":"**Version 1.1.0**, 🏅 See my project [here](https://github.com/Hesprs/Obsidian-Canvas-Web-Renderer-X).\n\nThis is a **web-based** viewer for **Obsidian Canvas** files that allows you to view and interact with your canvas files directly in the browser. Using this tool, you can embed interactive canvas to your front-end projects with ease.\n\nThis project is modified from [sofanati-nour/obsidian-canvas-web-renderer](https://github.com/sofanati-nour/obsidian-canvas-web-renderer), which is insightful, containing proficient expertise but also buggy and unable to use directly. So this project comes with supercharging, making it possible to be put into practical uses. All-round enhances were applied and more than 80% of the code is modified or added.\n\n| Titles                   | Information                                |\n| ------------------------ | ------------------------------------------ |\n| Technology stack         | HTML Canvas, Vanilla JavaScript            |\n| Open-source project used | Marked.js, Obsidian Canvas Web Renderer    |\n| Major Enhancements       | Experience & Bug fix & Performance & Aesthetics |\n| License                  | MIT License                                |\n",
+			"text":"**Version 1.1.1**, 🏅 See my project [here](https://github.com/Hesprs/Obsidian-Canvas-Web-Renderer-X).\n\nThis is a **web-based** viewer for **Obsidian Canvas** files that allows you to view and interact with your canvas files directly in the browser. Using this tool, you can embed interactive canvas to your front-end projects with ease.\n\nThis project is modified from [sofanati-nour/obsidian-canvas-web-renderer](https://github.com/sofanati-nour/obsidian-canvas-web-renderer), which is insightful, containing proficient expertise but also buggy and unable to use directly. So this project comes with supercharging, making it possible to be put into practical uses. All-round enhances were applied and more than 80% of the code is modified or added.\n\n| Titles                   | Information                                |\n| ------------------------ | ------------------------------------------ |\n| Technology stack         | HTML Canvas, Vanilla JavaScript            |\n| Open-source project used | Marked.js, Obsidian Canvas Web Renderer    |\n| Major Enhancements       | Experience & Bug fix & Performance & Aesthetics |\n| License                  | MIT License                                |\n",
 			"styleAttributes":{},
 			"x":1700,
 			"y":-340,
