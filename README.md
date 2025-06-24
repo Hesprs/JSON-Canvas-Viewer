@@ -1,4 +1,4 @@
-# Obsidian Canvas Web Renderer X Version 1.1.1
+# Obsidian Canvas Web Renderer X Version 1.2.0
 
 A **web-based** viewer for **Obsidian Canvas** files that allows you to view and interact with your canvas files directly in the browser. Using this tool, you can embed interactive canvas to your front-end projects with ease. See **demo** at https://hesprs.github.io/canvas_demo.
 
@@ -119,4 +119,3 @@ The project is built with vanilla JavaScript and HTML5 Canvas. Key files:
 - `index.html`: Main entry point
 - `styles.css`: Styles for render canvas on web
 - `app.js`: Core application logic
-- `colors.js`: Color configuration for nodes and groups

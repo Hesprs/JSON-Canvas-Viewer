@@ -1,12 +1,12 @@
+// V 1.2.0
+
 const nodeMap = {};
 const canvas = document.getElementById('myCanvas');
 const ctx = canvas.getContext('2d');
 const overlaysLayer = document.getElementById('overlays');
 const minimap = document.getElementById('minimap');
 const minimapCtx = minimap.getContext('2d');
-const linkIframes = {};
-const markdownDivs = {};
-const textDivs = {};
+const overlays = {};
 
 let canvasData = null;
 let canvasBaseDir = null;
@@ -14,10 +14,6 @@ let offsetX = canvas.width / 2;
 let offsetY = canvas.height / 2;
 let scale = 1.0;
 let isMinimapVisible = true;
-let drawScheduled = false;
-let lastMouseMove = 0;
-let lastWheel = 0;
-const THROTTLE_INTERVAL = 16; // ms
 let spatialGrid = null;
 const GRID_CELL_SIZE = 300;
 const FONT_COLOR = '#fff';
@@ -50,15 +46,6 @@ const overlayState = {
     selectedOverlayId: null,
     isHoveringSelectedOverlay: false
 };
-const minimapState = {
-    isMinimapVisible: true,
-    lastMinimapState: {
-        nodesHash: '',
-        offsetX: null,
-        offsetY: null,
-        scale: null
-    }
-};
 
 // === Init ===
 async function initCanvas() {
@@ -81,7 +68,62 @@ async function initCanvas() {
         canvas.height = window.innerHeight;
         setInitialView();
         requestDraw();
+        drawMinimap();
     } catch (err) { console.error('Failed to load canvas data:', err) }
+}
+
+const throttle = function(func, interval) {
+    let timeout = null;
+    let lastArgs = null;
+    let lastCallTime = -Infinity;
+    return function throttled(...args) {
+        const now = Date.now();
+        const timeSinceLast = now - lastCallTime;
+        if (timeSinceLast >= interval) {
+            func.apply(this, args);
+            lastCallTime = now;
+        } else {
+            lastArgs = args;
+            if (!timeout) {
+                timeout = setTimeout(() => {
+                    func.apply(this, lastArgs);
+                    lastCallTime = Date.now();
+                    timeout = null;
+                }, interval - timeSinceLast);
+            }
+        }
+    };
+}
+
+const getColor = (colorIndex) => {
+    let themeColor = null;
+    switch (colorIndex) {
+        case "1":
+            themeColor = "rgba(255, 120, 129, ?)";
+            break;
+        case "2":
+            themeColor = "rgba(251, 187, 131, ?)";
+            break;
+        case "3":
+            themeColor = "rgba(255, 232, 139, ?)";
+            break;
+        case "4":
+            themeColor = "rgba(124, 211, 124, ?)";
+            break;
+        case "5":
+            themeColor = "rgba(134, 223, 226, ?)";
+            break;
+        case "6":
+            themeColor = "rgba(203, 158, 255, ?)";
+            break;
+        default:
+            themeColor = "rgba(162, 162, 162, ?)";
+    }
+    return {
+        border: themeColor.replace("?", "0.75"),
+        background: themeColor.replace("?", "0.1"),
+        active: themeColor.replace("?", "1")
+    }
 }
 
 function onCanvasMouseDown(e) {
@@ -134,11 +176,8 @@ function onCanvasMouseUp(e) {
     dragState.isDragging = false;
 }
 
-function onCanvasMouseMove(e) {
+const onCanvasMouseMove = throttle((e) => {
     if (!dragState.isDragging) return;
-    const now = performance.now();
-    if (now - lastMouseMove < THROTTLE_INTERVAL) return;
-    lastMouseMove = now;
     const dx = e.clientX - dragState.lastClientX;
     const dy = e.clientY - dragState.lastClientY;
     offsetX += dx;
@@ -146,20 +185,16 @@ function onCanvasMouseMove(e) {
     dragState.lastClientX = e.clientX;
     dragState.lastClientY = e.clientY;
     requestDraw();
-}
+}, 16)
 
-function onWindowWheel(e) {
+const onWindowWheel = throttle((e) => {
     if (overlayState.isHoveringSelectedOverlay) return;
-    const now = performance.now();
-    if (now - lastWheel < THROTTLE_INTERVAL) return;
-    lastWheel = now;
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     const worldX = (mouseX - offsetX) / scale;
     const worldY = (mouseY - offsetY) / scale;
-    e.preventDefault();
-    const zoomFactor = 1.03;
+    const zoomFactor = 1.06;
     let newScale = scale;
     if (e.deltaY < 0) newScale *= zoomFactor;
     else newScale /= zoomFactor;
@@ -169,13 +204,14 @@ function onWindowWheel(e) {
     scale = newScale;
     zoomSlider.value = scaleToSlider(scale);
     requestDraw();
-}
+}, 16)
 
-function onWindowResize() {
+const onWindowResize = throttle( () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     requestDraw();
-}
+    updateViewportRectangle();
+}, 16)
 
 canvas.addEventListener('mousedown', onCanvasMouseDown);
 canvas.addEventListener('mouseup', onCanvasMouseUp);
@@ -183,22 +219,21 @@ canvas.addEventListener('mousemove', onCanvasMouseMove);
 canvas.addEventListener('touchstart', (e) => onCanvasMouseDown(e.touches[0]), { passive: true });
 canvas.addEventListener('touchend', (e) => onCanvasMouseUp(e.touches[0]), { passive: true });
 canvas.addEventListener('touchmove', (e) => onCanvasMouseMove(e.touches[0]), { passive: true });
-window.addEventListener('wheel', onWindowWheel, { passive: false });
+window.addEventListener('wheel', onWindowWheel, { passive: true });
 window.addEventListener('resize', onWindowResize);
 window.addEventListener('mouseleave', stopDragging);
 document.addEventListener('mouseout', function(e) { if (!e.relatedTarget) stopDragging() });
 initCanvas();
 const zoomSlider = document.getElementById('zoom-slider');
-const minimapCanvas = document.getElementById('minimap');
 const toggleMinimapBtn = document.getElementById('toggle-minimap');
 document.getElementById('zoom-in').addEventListener('click', () => updateScale(scale * 1.2));
 document.getElementById('zoom-out').addEventListener('click', () => updateScale(scale / 1.2));
 zoomSlider.addEventListener('input', (e) => updateScale(Math.pow(1.1, e.target.value)));
 document.getElementById('reset-view').addEventListener('click', setInitialView);
 toggleMinimapBtn.addEventListener('click', () => {
-    minimapState.isMinimapVisible = !minimapState.isMinimapVisible;
-    minimapCanvas.style.display = minimapState.isMinimapVisible ? 'block' : 'none';
-    toggleMinimapBtn.textContent = minimapState.isMinimapVisible ? 'Hide Minimap' : 'Show Minimap';
+    isMinimapVisible = !isMinimapVisible;
+    document.getElementsByClassName('minimap-container')[0].classList.toggle('collapsed')
+    if (isMinimapVisible) updateViewportRectangle();
 });
 const controlsPanel = document.getElementById('controls');
 const toggleCollapseBtn = document.getElementById('toggle-collapse');
@@ -219,22 +254,13 @@ document.addEventListener('fullscreenchange', updateFullscreenButton);
 updateFullscreenButton();
 
 // === Utility Functions ===
-function hashNodes(nodes) {
-    let hash = 0;
-    for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        hash += n.x + n.y + n.width + n.height;
-    }
-    return hash;
-}
-
 function stopDragging () {
     dragState.isDragging = false;
     dragState.isOverlayMouseDown = false;
 }
 
 function buildSpatialGrid() {
-    if (!canvasData || canvasData.nodes.length < 200) {
+    if (!canvasData || canvasData.nodes.length < 50) {
         spatialGrid = null;
         return;
     }
@@ -263,33 +289,29 @@ function getNodesAt(x, y) {
 }
 
 // === Draw ===
-function requestDraw() {
-    if (!drawScheduled) {
-        drawScheduled = true;
-        requestAnimationFrame(() => {
-            overlaysLayer.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#222';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.save();
-            ctx.translate(offsetX, offsetY);
-            ctx.scale(scale, scale);
-            // Cache viewport status for all nodes
-            canvasData.nodes.forEach(node => node._inViewport = isNodeInViewport(node));
-            canvasData.nodes.forEach(node => {
-                switch (node.type) {
-                    case 'group': drawGroup(node); break;
-                    case 'file': drawFileNode(node); break;
-                }
-            });
-            canvasData.edges.forEach(drawEdge);
-            ctx.restore();
-            updateAllOverlays();
-            drawMinimap();
-            drawScheduled = false;
+const requestDraw = throttle(() => {
+    requestAnimationFrame(() => {
+        overlaysLayer.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(offsetX, offsetY);
+        ctx.scale(scale, scale);
+        // Cache viewport status for all nodes
+        canvasData.nodes.forEach(node => node._inViewport = isNodeInViewport(node));
+        canvasData.nodes.forEach(node => {
+            switch (node.type) {
+                case 'group': drawGroup(node); break;
+                case 'file': drawFileNode(node); break;
+            }
         });
-    }
-}
+        canvasData.edges.forEach(drawEdge);
+        ctx.restore();
+        updateAllOverlays();
+        updateViewportRectangle();
+    });
+}, 16)
 
 function drawLabelBar(x, y, label, colors) {
     const barHeight = 30 * scale;
@@ -458,40 +480,79 @@ async function loadMarkdownForNode(node) {
 }
 
 function updateAllOverlays() {
-    const neededText = new Set();
-    const neededMarkdown = new Set();
+    const neededOverlays = new Set();
     const overlayCreators = {
         text: (node) => {
             if (node._inViewport) {
-                neededText.add(node.id);
-                updateOrCreateOverlay(node, textDivs, node.text, 'text');
+                neededOverlays.add(node.id);
+                updateOrCreateOverlay(node, node.text, 'text');
             }
         },
         file: (node) => {
-            if (node.file.match(/\.md$/i) && node.mdContent) {
-                neededMarkdown.add(node.id);
-                updateOrCreateOverlay(node, markdownDivs, node.mdContent, 'markdown');
+            if (node.file.match(/\.md$/i) && node.mdContent && node._inViewport) {
+                neededOverlays.add(node.id);
+                updateOrCreateOverlay(node, node.mdContent, 'markdown');
             }
         },
-        link: (node) => { updateOrCreateOverlay(node, linkIframes, node.url, 'link') }
+        link: (node) => {
+            neededOverlays.add(node.id);
+            updateOrCreateOverlay(node, node.url, 'link')
+        }
     };
     canvasData.nodes.forEach(node => {
         if (overlayCreators[node.type]) overlayCreators[node.type](node);
     });
-    Object.keys(textDivs).forEach(id => {
-        if (!neededText.has(id)) {
-            const div = textDivs[id];
+    Object.keys(overlays).forEach(id => {
+        if (!neededOverlays.has(id)) {
+            const div = overlays[id];
             if (div && div.parentNode) div.parentNode.removeChild(div);
-            delete textDivs[id];
+            delete overlays[id];
         }
     });
-    Object.keys(markdownDivs).forEach(id => {
-        if (!neededMarkdown.has(id)) {
-            const div = markdownDivs[id];
-            if (div && div.parentNode) div.parentNode.removeChild(div);
-            delete markdownDivs[id];
+}
+
+function updateOrCreateOverlay(node, content, type) {
+    let element = overlays[node.id];
+    if (!element) {
+        element = createOverlayElement(type, node);
+        overlaysLayer.appendChild(element);
+        overlays[node.id] = element;
+        attachOverlayEventListeners(element, node);
+        element.style.left = node.x + 'px';
+        element.style.top = node.y + 'px';
+        element.style.width = node.width + 'px';
+        element.style.height = node.height + 'px';
+        const colourClass = node.color == undefined ? 'color-0' : 'color-' + node.color;  
+        element.classList.add(colourClass);
+    }
+    if (type === 'markdown' || type === 'text') {
+        if (element.originalContent == undefined || element.originalContent !== content) { 
+            element.originalContent = content;
+            const parsedContentWrapper = document.createElement('div');
+            parsedContentWrapper.innerHTML = window.marked.parse(content || '');
+            parsedContentWrapper.classList.add('parsed-content-wrapper');
+            element.innerHTML = '';
+            element.appendChild(parsedContentWrapper);
         }
-    });
+        if (node.mdFrontmatter?.direction === 'rtl' && !element.classList.contains('rtl')) element.classList.add('rtl');
+    }
+    if (overlayState.selectedOverlayId === node.id) element.classList.add('active');
+    else if (element.classList.contains('active')) element.classList.remove('active');
+    if (overlayState.selectedOverlayId === node.id) {
+        if (!element._hasHoverListeners) {
+            element._mouseenterHandler = () => { if (overlayState.selectedOverlayId === node.id) overlayState.isHoveringSelectedOverlay = true; };
+            element._mouseleaveHandler = () => { if (overlayState.selectedOverlayId === node.id) overlayState.isHoveringSelectedOverlay = false; };
+            element.addEventListener('mouseenter', element._mouseenterHandler);
+            element.addEventListener('mouseleave', element._mouseleaveHandler);
+            element._hasHoverListeners = true;
+        }
+    } else {
+        if (element._hasHoverListeners) {
+            element.removeEventListener('mouseenter', element._mouseenterHandler);
+            element.removeEventListener('mouseleave', element._mouseleaveHandler);
+            element._hasHoverListeners = false;
+        }
+    }
 }
 
 function createOverlayElement(type, node) {
@@ -508,70 +569,12 @@ function createOverlayElement(type, node) {
         iframe.className = 'link-iframe';
         const clickLayer = document.createElement('div');
         clickLayer.className = 'link-click-layer';
-        clickLayer.addEventListener('mouseup', (e) => {
-            if (e.button !== 0) return;
-            if (dragState.isOverlayMouseDown) return;
-            overlayState.selectedOverlayId = node.id;
-            updateAllOverlays();
-            overlayState.isHoveringSelectedOverlay = true;
-            e.stopPropagation();
-        });
         element.appendChild(iframe);
         element.appendChild(clickLayer);
         element._iframe = iframe;
         element._clickLayer = clickLayer;
     }
     return element;
-}
-
-function updateOrCreateOverlay(node, divMap, content, type) {
-    let element = divMap[node.id];
-    if (!element) {
-        element = createOverlayElement(type, node);
-        overlaysLayer.appendChild(element);
-        divMap[node.id] = element;
-        attachOverlayEventListeners(element, node);
-    }
-    element.style.left = node.x + 'px';
-    element.style.top = node.y + 'px';
-    element.style.width = node.width + 'px';
-    element.style.height = node.height + 'px';
-    element.style.pointerEvents = 'auto';
-    if (type === 'markdown' || type === 'text') {
-        if (element.originalContent == undefined || element.originalContent !== content) { 
-            element.originalContent = content;
-            const parsedContentWrapper = document.createElement('div');
-            parsedContentWrapper.innerHTML = window.marked.parse(content || '');
-            parsedContentWrapper.classList.add('parsed-content-wrapper');
-            element.innerHTML = '';
-            element.appendChild(parsedContentWrapper);
-        }
-    }
-    if (type === 'markdown' || type === 'text') {
-        if (node.mdFrontmatter?.direction === 'rtl') element.classList.add('rtl');
-        else element.classList.remove('rtl');
-        element.style.color = FONT_COLOR;
-    }
-    if (overlayState.selectedOverlayId === node.id) element.classList.add('active');
-    else element.classList.remove('active');
-    element.style.backgroundColor = getColor(node.color).background;
-    if (overlayState.selectedOverlayId === node.id) {
-        element.style.borderColor = getColor(node.color).active;
-        if (!element._hasHoverListeners) {
-            element._mouseenterHandler = () => { if (overlayState.selectedOverlayId === node.id) overlayState.isHoveringSelectedOverlay = true; };
-            element._mouseleaveHandler = () => { if (overlayState.selectedOverlayId === node.id) overlayState.isHoveringSelectedOverlay = false; };
-            element.addEventListener('mouseenter', element._mouseenterHandler);
-            element.addEventListener('mouseleave', element._mouseleaveHandler);
-            element._hasHoverListeners = true;
-        }
-    } else {
-        element.style.borderColor = getColor(node.color).border;
-        if (element._hasHoverListeners) {
-            element.removeEventListener('mouseenter', element._mouseenterHandler);
-            element.removeEventListener('mouseleave', element._mouseleaveHandler);
-            element._hasHoverListeners = false;
-        }
-    }
 }
 
 function drawEdge(edge) {
@@ -684,20 +687,8 @@ function drawArrowhead(tipX, tipY, fromX, fromY) {
     ctx.fill();
 }
 
+// === Minimap ===
 function drawMinimap() {
-    if (!isMinimapVisible) return;
-    // Compute hash/state
-    const nodesHash = canvasData && canvasData.nodes ? hashNodes(canvasData.nodes) : '';
-    if (
-        minimapState.lastMinimapState.nodesHash === nodesHash &&
-        minimapState.lastMinimapState.offsetX === offsetX &&
-        minimapState.lastMinimapState.offsetY === offsetY &&
-        minimapState.lastMinimapState.scale === scale
-    ) return;
-    minimapState.lastMinimapState.nodesHash = nodesHash;
-    minimapState.lastMinimapState.offsetX = offsetX;
-    minimapState.lastMinimapState.offsetY = offsetY;
-    minimapState.lastMinimapState.scale = scale;
     minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
     minimapCtx.fillStyle = '#333';
     minimapCtx.fillRect(0, 0, minimap.width, minimap.height);
@@ -717,7 +708,6 @@ function drawMinimap() {
     for (let edge of canvasData.edges) drawMinimapEdge(edge);
     for (let node of canvasData.nodes) drawMinimapNode(node);
     minimapCtx.restore();
-    drawViewportRect(bounds, minimapScale);
 }
 
 function calculateNodesBounds() {
@@ -756,25 +746,34 @@ function drawMinimapEdge(edge) {
     minimapCtx.stroke();
 }
 
-function drawViewportRect(bounds, minimapScale) {
+function updateViewportRectangle() {
+    if (!isMinimapVisible) return;
+    const bounds = calculateNodesBounds();
+    if (!bounds) return;
+    const minimap = document.getElementById('minimap');
     const contentWidth = bounds.maxX - bounds.minX;
     const contentHeight = bounds.maxY - bounds.minY;
-    const viewportCenterX = -offsetX / scale + canvas.width / (2 * scale);
-    const viewportCenterY = -offsetY / scale + canvas.height / (2 * scale);
-    const viewWidth = canvas.width / scale;
-    const viewHeight = canvas.height / scale;
-    minimapCtx.save();
-    minimapCtx.resetTransform();
+    const scaleX = minimap.width / contentWidth;
+    const scaleY = minimap.height / contentHeight;
+    const minimapScale = Math.min(scaleX, scaleY) * 0.9;
     const centerX = minimap.width / 2;
     const centerY = minimap.height / 2;
+    // Viewport in world coords
+    const viewWidth = canvas.width / scale;
+    const viewHeight = canvas.height / scale;
+    const viewportCenterX = -offsetX / scale + canvas.width / (2 * scale);
+    const viewportCenterY = -offsetY / scale + canvas.height / (2 * scale);
+    // Rectangle in minimap coords
     const viewRectX = centerX + (viewportCenterX - viewWidth/2 - (bounds.minX + contentWidth/2)) * minimapScale;
     const viewRectY = centerY + (viewportCenterY - viewHeight/2 - (bounds.minY + contentHeight/2)) * minimapScale;
     const viewRectWidth = viewWidth * minimapScale;
     const viewRectHeight = viewHeight * minimapScale;
-    minimapCtx.strokeStyle = '#fff';
-    minimapCtx.lineWidth = 2;
-    minimapCtx.strokeRect(viewRectX, viewRectY, viewRectWidth, viewRectHeight);
-    minimapCtx.restore();
+    const viewportRect = document.getElementById('viewport-rectangle');
+    viewportRect.style.display = isMinimapVisible ? 'block' : 'none';
+    viewportRect.style.left = viewRectX + 'px';
+    viewportRect.style.top = viewRectY + 'px';
+    viewportRect.style.width = viewRectWidth + 'px';
+    viewportRect.style.height = viewRectHeight + 'px';
 }
 
 function setInitialView() {
@@ -800,6 +799,7 @@ function setInitialView() {
     requestDraw();
 }
 
+// === Scale Computing ===
 function screenToWorld(screenX, screenY) {
     return {
         x: (screenX - offsetX) / scale,
