@@ -1,4 +1,4 @@
-// V 1.2.0
+// V 1.3.0
 
 const nodeMap = {};
 const canvas = document.getElementById('myCanvas');
@@ -15,12 +15,9 @@ let offsetY = canvas.height / 2;
 let scale = 1.0;
 let isMinimapVisible = true;
 let spatialGrid = null;
+let isRequesting = false;
 const GRID_CELL_SIZE = 300;
 const FONT_COLOR = '#fff';
-
-// Overlay drag-to-pan logic
-const OVERLAY_DRAG_THRESHOLD = 5;
-
 // Markdown and image cache
 const markdownCache = {};
 const imageCache = {};
@@ -37,10 +34,7 @@ const dragState = {
     lastY: 0,
     lastClientX: 0,
     lastClientY: 0,
-    isOverlayMouseDown: false,
-    overlayMouseDownX: 0,
-    overlayMouseDownY: 0,
-    overlayDragStarted: false
+    lastTouchPoint: null
 };
 const overlayState = {
     selectedOverlayId: null,
@@ -126,26 +120,66 @@ const getColor = (colorIndex) => {
     }
 }
 
-function onCanvasMouseDown(e) {
+// Add window-level event listeners
+window.addEventListener('mousedown', onWindowMouseDown);
+window.addEventListener('mouseup', onWindowMouseUp);
+window.addEventListener('touchstart', (e) => onWindowMouseDown(e.touches[0], true), { passive: true });
+window.addEventListener('touchmove', (e) => onWindowMouseMove(e.touches[0], true), { passive: true });
+window.addEventListener('touchend', () => onWindowMouseUp(dragState.lastTouchPoint), { passive: true });
+
+function isUIControl(target) {
+    // Check if the event target is a button, input, slider, or inside controls/minimap
+    return target.closest && (
+        target.closest('#controls') ||
+        target.closest('button') ||
+        target.closest('input')
+    );
+}
+
+function onWindowMouseDown(e, touch = false) {
+    if (isUIControl(e.target)) return;
+    if (touch) {
+        overlayState.isHoveringSelectedOverlay = false;
+        const worldCoords = pointerAtWorld(e);
+        const candidates = getNodesAt(worldCoords.x, worldCoords.y);
+        for (const node of candidates) {
+            if (worldCoords.x < node.x || worldCoords.x > node.x + node.width || worldCoords.y < node.y || worldCoords.y > node.y + node.height) continue;
+            if (node.id === overlayState.selectedOverlayId) overlayState.isHoveringSelectedOverlay = true;
+        }
+    }
+    if (overlayState.isHoveringSelectedOverlay) return;
+    if (touch) dragState.lastTouchPoint = e;
     dragState.isDragging = true;
-    dragState.lastX = e.offsetX;
-    dragState.lastY = e.offsetY;
+    dragState.lastX = e.clientX;
+    dragState.lastY = e.clientY;
     dragState.lastClientX = e.clientX;
     dragState.lastClientY = e.clientY;
 }
 
-function onCanvasMouseUp(e) {
+const onWindowMouseMove = throttle((e, touch = false) => {
+    if (!dragState.isDragging) return;
+    const dx = e.clientX - dragState.lastClientX;
+    const dy = e.clientY - dragState.lastClientY;
+    offsetX += dx;
+    offsetY += dy;
+    dragState.lastClientX = e.clientX;
+    dragState.lastClientY = e.clientY;
+    if (touch) dragState.lastTouchPoint = e;
+    requestDraw();
+}, 16)
+
+window.addEventListener('mousemove', onWindowMouseMove);
+
+function onWindowMouseUp(e) {
+    if (!dragState.isDragging) return;
+    dragState.isDragging = false;
     if ((dragState.lastClientX - dragState.lastX) ** 2 + (dragState.lastClientY - dragState.lastY) ** 2 < 25) {
-        if (e.target === canvas) {
-            overlayState.selectedOverlayId = null;
-            updateAllOverlays();
-        }
-        const worldCoords = screenToWorld(e.offsetX, e.offsetY);
+        if (e.target === canvas) select(null);
+        const worldCoords = pointerAtWorld(e);
         const candidates = getNodesAt(worldCoords.x, worldCoords.y);
         for (let node of candidates) {
-            if (node.type !== 'file') continue;
-            if (worldCoords.x >= node.x && worldCoords.x <= node.x + node.width &&
-                worldCoords.y >= node.y && worldCoords.y <= node.y + node.height) {
+            if (worldCoords.x < node.x || worldCoords.x > node.x + node.width || worldCoords.y < node.y || worldCoords.y > node.y + node.height) continue;
+            if (node.type === 'file') {
                 if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {
                     const img = new Image();
                     img.src = canvasBaseDir + node.file;
@@ -166,26 +200,40 @@ function onCanvasMouseUp(e) {
                     audio.src = canvasBaseDir + node.file;
                     audio.style.width = '300px';
                     createPreviewModal(audio, 'audio');
-                }
+                } else if (node.file.match(/\.md$/i)) select(node.id);
+                break;
+            } else if (node.type === 'text' || node.type === 'link') {
+                select(node.id);
                 break;
             }
         }
     }
-    dragState.isOverlayMouseDown = false;
-    dragState.overlayDragStarted = false;
-    dragState.isDragging = false;
 }
 
-const onCanvasMouseMove = throttle((e) => {
-    if (!dragState.isDragging) return;
-    const dx = e.clientX - dragState.lastClientX;
-    const dy = e.clientY - dragState.lastClientY;
-    offsetX += dx;
-    offsetY += dy;
-    dragState.lastClientX = e.clientX;
-    dragState.lastClientY = e.clientY;
-    requestDraw();
-}, 16)
+function select(id) {
+    const previous = overlayState.selectedOverlayId === null ? null : document.getElementById(overlayState.selectedOverlayId);
+    const current = id === null ? null : document.getElementById(id);
+    if (previous) {
+        previous.classList.remove('active');
+        if (previous._hasHoverListeners) {
+            previous.removeEventListener('mouseenter', previous._mouseenterHandler);
+            previous.removeEventListener('mouseleave', previous._mouseleaveHandler);
+            previous._hasHoverListeners = false;
+        }
+    }
+    if (current) {
+        current.classList.add('active');
+        overlayState.isHoveringSelectedOverlay = true;
+        if (!current._hasHoverListeners) {
+            current._mouseenterHandler = () => { overlayState.isHoveringSelectedOverlay = true; };
+            current._mouseleaveHandler = () => { overlayState.isHoveringSelectedOverlay = false; };
+            current.addEventListener('mouseenter', current._mouseenterHandler);
+            current.addEventListener('mouseleave', current._mouseleaveHandler);
+            current._hasHoverListeners = true;
+        }
+    } else overlayState.isHoveringSelectedOverlay = false;
+    overlayState.selectedOverlayId = id;
+}
 
 const onWindowWheel = throttle((e) => {
     if (overlayState.isHoveringSelectedOverlay) return;
@@ -210,19 +258,10 @@ const onWindowResize = throttle( () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     requestDraw();
-    updateViewportRectangle();
 }, 16)
 
-canvas.addEventListener('mousedown', onCanvasMouseDown);
-canvas.addEventListener('mouseup', onCanvasMouseUp);
-canvas.addEventListener('mousemove', onCanvasMouseMove);
-canvas.addEventListener('touchstart', (e) => onCanvasMouseDown(e.touches[0]), { passive: true });
-canvas.addEventListener('touchend', (e) => onCanvasMouseUp(e.touches[0]), { passive: true });
-canvas.addEventListener('touchmove', (e) => onCanvasMouseMove(e.touches[0]), { passive: true });
 window.addEventListener('wheel', onWindowWheel, { passive: true });
 window.addEventListener('resize', onWindowResize);
-window.addEventListener('mouseleave', stopDragging);
-document.addEventListener('mouseout', function(e) { if (!e.relatedTarget) stopDragging() });
 initCanvas();
 const zoomSlider = document.getElementById('zoom-slider');
 const toggleMinimapBtn = document.getElementById('toggle-minimap');
@@ -238,7 +277,6 @@ toggleMinimapBtn.addEventListener('click', () => {
 const controlsPanel = document.getElementById('controls');
 const toggleCollapseBtn = document.getElementById('toggle-collapse');
 toggleCollapseBtn.addEventListener('click', () => { controlsPanel.classList.toggle('collapsed') });
-controlsPanel.addEventListener('mouseenter', stopDragging);
 
 // === Fullscreen ===
 const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
@@ -254,10 +292,7 @@ document.addEventListener('fullscreenchange', updateFullscreenButton);
 updateFullscreenButton();
 
 // === Utility Functions ===
-function stopDragging () {
-    dragState.isDragging = false;
-    dragState.isOverlayMouseDown = false;
-}
+
 
 function buildSpatialGrid() {
     if (!canvasData || canvasData.nodes.length < 50) {
@@ -289,7 +324,9 @@ function getNodesAt(x, y) {
 }
 
 // === Draw ===
-const requestDraw = throttle(() => {
+function requestDraw() {
+    if (isRequesting) return;
+    isRequesting = true;
     requestAnimationFrame(() => {
         overlaysLayer.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -310,8 +347,9 @@ const requestDraw = throttle(() => {
         ctx.restore();
         updateAllOverlays();
         updateViewportRectangle();
+        isRequesting = false;
     });
-}, 16)
+}
 
 function drawLabelBar(x, y, label, colors) {
     const barHeight = 30 * scale;
@@ -412,13 +450,7 @@ function drawFileNode(node) {
                 ctx.restore();
             }
         } else if (node.imageElement) node.imageElement = null;
-    } else if (node.file.match(/\.md$/i)) {
-        if (node._inViewport) loadMarkdownForNode(node);
-        else if (node.mdContent) {
-            node.mdContent = null;
-            node.mdFrontmatter = null;
-        }
-    }
+    } else if (node.file.match(/\.md$/i)) if (node._inViewport) loadMarkdownForNode(node);
 }
 
 function isNodeInViewport(node, margin = 200) {
@@ -476,7 +508,7 @@ async function loadMarkdownForNode(node) {
         node.mdContent = 'Loading...';
         node.mdFrontmatter = null;
     }
-    updateAllOverlays();
+    updateOrCreateOverlay(node, node.mdContent, 'markdown');
 }
 
 function updateAllOverlays() {
@@ -517,13 +549,10 @@ function updateOrCreateOverlay(node, content, type) {
         element = createOverlayElement(type, node);
         overlaysLayer.appendChild(element);
         overlays[node.id] = element;
-        attachOverlayEventListeners(element, node);
         element.style.left = node.x + 'px';
         element.style.top = node.y + 'px';
         element.style.width = node.width + 'px';
         element.style.height = node.height + 'px';
-        const colourClass = node.color == undefined ? 'color-0' : 'color-' + node.color;  
-        element.classList.add(colourClass);
     }
     if (type === 'markdown' || type === 'text') {
         if (element.originalContent == undefined || element.originalContent !== content) { 
@@ -535,23 +564,6 @@ function updateOrCreateOverlay(node, content, type) {
             element.appendChild(parsedContentWrapper);
         }
         if (node.mdFrontmatter?.direction === 'rtl' && !element.classList.contains('rtl')) element.classList.add('rtl');
-    }
-    if (overlayState.selectedOverlayId === node.id) element.classList.add('active');
-    else if (element.classList.contains('active')) element.classList.remove('active');
-    if (overlayState.selectedOverlayId === node.id) {
-        if (!element._hasHoverListeners) {
-            element._mouseenterHandler = () => { if (overlayState.selectedOverlayId === node.id) overlayState.isHoveringSelectedOverlay = true; };
-            element._mouseleaveHandler = () => { if (overlayState.selectedOverlayId === node.id) overlayState.isHoveringSelectedOverlay = false; };
-            element.addEventListener('mouseenter', element._mouseenterHandler);
-            element.addEventListener('mouseleave', element._mouseleaveHandler);
-            element._hasHoverListeners = true;
-        }
-    } else {
-        if (element._hasHoverListeners) {
-            element.removeEventListener('mouseenter', element._mouseenterHandler);
-            element.removeEventListener('mouseleave', element._mouseleaveHandler);
-            element._hasHoverListeners = false;
-        }
     }
 }
 
@@ -574,6 +586,10 @@ function createOverlayElement(type, node) {
         element._iframe = iframe;
         element._clickLayer = clickLayer;
     }
+    element.id = node.id;
+    const colourClass = node.color == undefined ? 'color-0' : 'color-' + node.color;  
+    element.classList.add(colourClass);
+    if (overlayState.selectedOverlayId === node.id) element.classList.add('active');
     return element;
 }
 
@@ -800,7 +816,10 @@ function setInitialView() {
 }
 
 // === Scale Computing ===
-function screenToWorld(screenX, screenY) {
+function pointerAtWorld(e) {
+    const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
     return {
         x: (screenX - offsetX) / scale,
         y: (screenY - offsetY) / scale
@@ -848,50 +867,4 @@ function createPreviewModal(content, type) {
     backdrop.onclick = closeModal;
     document.body.appendChild(backdrop);
     document.body.appendChild(modal);
-}
-
-function handleOverlayMousedown(e) {
-    if (overlayState.isHoveringSelectedOverlay) return;
-    Object.assign(dragState, {
-        isOverlayMouseDown: true,
-        overlayMouseDownX: e.clientX,
-        overlayMouseDownY: e.clientY,
-        overlayDragStarted: false,
-        lastClientX: e.clientX,
-        lastClientY: e.clientY
-    });
-}
-
-function handleOverlayMousemove(e) {
-    if (!dragState.isOverlayMouseDown) return;
-    const dx = e.clientX - dragState.overlayMouseDownX;
-    const dy = e.clientY - dragState.overlayMouseDownY;
-    if (!dragState.overlayDragStarted && (Math.abs(dx) > OVERLAY_DRAG_THRESHOLD || Math.abs(dy) > OVERLAY_DRAG_THRESHOLD)) {
-        dragState.isDragging = dragState.overlayDragStarted = true;
-    }
-    if (!dragState.overlayDragStarted) return;
-    offsetX += e.clientX - dragState.lastClientX;
-    offsetY += e.clientY - dragState.lastClientY;
-    dragState.lastClientX = e.clientX;
-    dragState.lastClientY = e.clientY;
-    requestDraw();
-}
-
-function handleOverlayMouseup(node) {
-    if (!dragState.isOverlayMouseDown) return;
-    if (!dragState.overlayDragStarted) {
-        overlayState.selectedOverlayId = node.id;
-        updateAllOverlays();
-        overlayState.isHoveringSelectedOverlay = true;
-    }
-    dragState.isOverlayMouseDown = dragState.overlayDragStarted = dragState.isDragging = false;
-}
-
-function attachOverlayEventListeners(element, node) {
-    element.addEventListener('mousedown', handleOverlayMousedown);
-    element.addEventListener('mousemove', handleOverlayMousemove);
-    element.addEventListener('mouseup', () => handleOverlayMouseup(node));
-    element.addEventListener('touchstart', (e) => handleOverlayMousedown(e.touches[0]), { passive: true });
-    element.addEventListener('touchend', () => handleOverlayMouseup(node), { passive: true });
-    element.addEventListener('touchmove', (e) => handleOverlayMousemove(e.touches[0]), { passive: true });
 }
