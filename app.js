@@ -1,4 +1,4 @@
-// V 1.3.0
+// V 1.3.1
 
 const nodeMap = {};
 const canvas = document.getElementById('myCanvas');
@@ -16,6 +16,7 @@ let scale = 1.0;
 let isMinimapVisible = true;
 let spatialGrid = null;
 let isRequesting = false;
+let touchPadMode = false;
 const GRID_CELL_SIZE = 300;
 const FONT_COLOR = '#fff';
 // Markdown and image cache
@@ -41,16 +42,35 @@ const overlayState = {
     isHoveringSelectedOverlay: false
 };
 
+// === Pinch-to-Zoom State ===
+const pinchZoomState = {
+    isPinching: false,
+    initialDistance: 0,
+    initialScale: 1,
+    initialMidpoint: { x: 0, y: 0 },
+    lastTouches: [],
+    lastMidpointX: 0,
+    lastMidpointY: 0
+};
+
+function overlayJudger(node) {
+    const type = node == undefined ? 'default' : node.type;
+    switch (type) {
+        case 'text': return 1;
+        case 'link': return 1;
+        case 'file': return node.file.match(/\.md$/i) ? 1 : 2;
+        default: return 0;
+    }
+}
+
 // === Init ===
 async function initCanvas() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
         const canvasPath = urlParams.get('path') ? decodeURIComponent(urlParams.get('path')) : 'example/introduction.canvas';
         // Determine base directory for related files
-        if (/^https?:\/\//.test(canvasPath)) {
-            // Remote URL
-            canvasBaseDir = canvasPath.substring(0, canvasPath.lastIndexOf('/') + 1);
-        } else {
+        if (/^https?:\/\//.test(canvasPath)) canvasBaseDir = canvasPath.substring(0, canvasPath.lastIndexOf('/') + 1);
+        else {
             // Local or relative path
             const lastSlash = canvasPath.lastIndexOf('/');
             canvasBaseDir = lastSlash !== -1 ? canvasPath.substring(0, lastSlash + 1) : './';
@@ -67,8 +87,6 @@ async function initCanvas() {
 }
 
 const throttle = function(func, interval) {
-    let timeout = null;
-    let lastArgs = null;
     let lastCallTime = -Infinity;
     return function throttled(...args) {
         const now = Date.now();
@@ -76,20 +94,11 @@ const throttle = function(func, interval) {
         if (timeSinceLast >= interval) {
             func.apply(this, args);
             lastCallTime = now;
-        } else {
-            lastArgs = args;
-            if (!timeout) {
-                timeout = setTimeout(() => {
-                    func.apply(this, lastArgs);
-                    lastCallTime = Date.now();
-                    timeout = null;
-                }, interval - timeSinceLast);
-            }
         }
     };
 }
 
-const getColor = (colorIndex) => {
+function getColor(colorIndex) {
     let themeColor = null;
     switch (colorIndex) {
         case "1":
@@ -120,176 +129,19 @@ const getColor = (colorIndex) => {
     }
 }
 
-// Add window-level event listeners
-window.addEventListener('mousedown', onWindowMouseDown);
-window.addEventListener('mouseup', onWindowMouseUp);
-window.addEventListener('touchstart', (e) => onWindowMouseDown(e.touches[0], true), { passive: true });
-window.addEventListener('touchmove', (e) => onWindowMouseMove(e.touches[0], true), { passive: true });
-window.addEventListener('touchend', () => onWindowMouseUp(dragState.lastTouchPoint), { passive: true });
-
-function isUIControl(target) {
-    // Check if the event target is a button, input, slider, or inside controls/minimap
-    return target.closest && (
-        target.closest('#controls') ||
-        target.closest('button') ||
-        target.closest('input')
-    );
-}
-
-function onWindowMouseDown(e, touch = false) {
-    if (isUIControl(e.target)) return;
-    if (touch) {
-        overlayState.isHoveringSelectedOverlay = false;
-        const worldCoords = pointerAtWorld(e);
-        const candidates = getNodesAt(worldCoords.x, worldCoords.y);
-        for (const node of candidates) {
-            if (worldCoords.x < node.x || worldCoords.x > node.x + node.width || worldCoords.y < node.y || worldCoords.y > node.y + node.height) continue;
-            if (node.id === overlayState.selectedOverlayId) overlayState.isHoveringSelectedOverlay = true;
-        }
-    }
-    if (overlayState.isHoveringSelectedOverlay) return;
-    if (touch) dragState.lastTouchPoint = e;
-    dragState.isDragging = true;
-    dragState.lastX = e.clientX;
-    dragState.lastY = e.clientY;
-    dragState.lastClientX = e.clientX;
-    dragState.lastClientY = e.clientY;
-}
-
-const onWindowMouseMove = throttle((e, touch = false) => {
-    if (!dragState.isDragging) return;
-    const dx = e.clientX - dragState.lastClientX;
-    const dy = e.clientY - dragState.lastClientY;
-    offsetX += dx;
-    offsetY += dy;
-    dragState.lastClientX = e.clientX;
-    dragState.lastClientY = e.clientY;
-    if (touch) dragState.lastTouchPoint = e;
-    requestDraw();
-}, 16)
-
-window.addEventListener('mousemove', onWindowMouseMove);
-
-function onWindowMouseUp(e) {
-    if (!dragState.isDragging) return;
-    dragState.isDragging = false;
-    if ((dragState.lastClientX - dragState.lastX) ** 2 + (dragState.lastClientY - dragState.lastY) ** 2 < 25) {
-        if (e.target === canvas) select(null);
-        const worldCoords = pointerAtWorld(e);
-        const candidates = getNodesAt(worldCoords.x, worldCoords.y);
-        for (let node of candidates) {
-            if (worldCoords.x < node.x || worldCoords.x > node.x + node.width || worldCoords.y < node.y || worldCoords.y > node.y + node.height) continue;
-            if (node.type === 'file') {
-                if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {
-                    const img = new Image();
-                    img.src = canvasBaseDir + node.file;
-                    img.className = 'canvas-preview-img';
-                    const backdrop = document.createElement('div');
-                    backdrop.className = 'canvas-preview-backdrop';
-                    const closePreview = () => {
-                        document.body.removeChild(img);
-                        document.body.removeChild(backdrop);
-                    };
-                    img.onclick = closePreview;
-                    backdrop.onclick = closePreview;
-                    document.body.appendChild(backdrop);
-                    document.body.appendChild(img);
-                } else if (node.file.match(/\.mp3$/i)) {
-                    const audio = document.createElement('audio');
-                    audio.controls = true;
-                    audio.src = canvasBaseDir + node.file;
-                    audio.style.width = '300px';
-                    createPreviewModal(audio, 'audio');
-                } else if (node.file.match(/\.md$/i)) select(node.id);
-                break;
-            } else if (node.type === 'text' || node.type === 'link') {
-                select(node.id);
-                break;
-            }
-        }
-    }
-}
-
-function select(id) {
-    const previous = overlayState.selectedOverlayId === null ? null : document.getElementById(overlayState.selectedOverlayId);
-    const current = id === null ? null : document.getElementById(id);
-    if (previous) {
-        previous.classList.remove('active');
-        if (previous._hasHoverListeners) {
-            previous.removeEventListener('mouseenter', previous._mouseenterHandler);
-            previous.removeEventListener('mouseleave', previous._mouseleaveHandler);
-            previous._hasHoverListeners = false;
-        }
-    }
-    if (current) {
-        current.classList.add('active');
-        overlayState.isHoveringSelectedOverlay = true;
-        if (!current._hasHoverListeners) {
-            current._mouseenterHandler = () => { overlayState.isHoveringSelectedOverlay = true; };
-            current._mouseleaveHandler = () => { overlayState.isHoveringSelectedOverlay = false; };
-            current.addEventListener('mouseenter', current._mouseenterHandler);
-            current.addEventListener('mouseleave', current._mouseleaveHandler);
-            current._hasHoverListeners = true;
-        }
-    } else overlayState.isHoveringSelectedOverlay = false;
-    overlayState.selectedOverlayId = id;
-}
-
-const onWindowWheel = throttle((e) => {
-    if (overlayState.isHoveringSelectedOverlay) return;
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const worldX = (mouseX - offsetX) / scale;
-    const worldY = (mouseY - offsetY) / scale;
-    const zoomFactor = 1.06;
-    let newScale = scale;
-    if (e.deltaY < 0) newScale *= zoomFactor;
-    else newScale /= zoomFactor;
-    newScale = Math.max(0.05, Math.min(20, newScale));
-    offsetX = mouseX - worldX * newScale;
-    offsetY = mouseY - worldY * newScale;
-    scale = newScale;
-    zoomSlider.value = scaleToSlider(scale);
-    requestDraw();
-}, 16)
-
 const onWindowResize = throttle( () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     requestDraw();
 }, 16)
 
-window.addEventListener('wheel', onWindowWheel, { passive: true });
-window.addEventListener('resize', onWindowResize);
-initCanvas();
-const zoomSlider = document.getElementById('zoom-slider');
-const toggleMinimapBtn = document.getElementById('toggle-minimap');
-document.getElementById('zoom-in').addEventListener('click', () => updateScale(scale * 1.2));
-document.getElementById('zoom-out').addEventListener('click', () => updateScale(scale / 1.2));
-zoomSlider.addEventListener('input', (e) => updateScale(Math.pow(1.1, e.target.value)));
-document.getElementById('reset-view').addEventListener('click', setInitialView);
-toggleMinimapBtn.addEventListener('click', () => {
-    isMinimapVisible = !isMinimapVisible;
-    document.getElementsByClassName('minimap-container')[0].classList.toggle('collapsed')
-    if (isMinimapVisible) updateViewportRectangle();
-});
-const controlsPanel = document.getElementById('controls');
-const toggleCollapseBtn = document.getElementById('toggle-collapse');
-toggleCollapseBtn.addEventListener('click', () => { controlsPanel.classList.toggle('collapsed') });
-
-// === Fullscreen ===
-const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
-function updateFullscreenButton() {
-    if (document.fullscreenElement === document.documentElement) toggleFullscreenBtn.textContent = '🡼';
-    else toggleFullscreenBtn.textContent = '⛶';
+function isUIControl(target) {
+    return target.closest && (
+        target.closest('#controls') ||
+        target.closest('button') ||
+        target.closest('input')
+    );
 }
-toggleFullscreenBtn.addEventListener('click', () => {
-    if (document.fullscreenElement !== document.documentElement) document.documentElement.requestFullscreen();
-    else document.exitFullscreen();
-});
-document.addEventListener('fullscreenchange', updateFullscreenButton);
-updateFullscreenButton();
 
 // === Utility Functions ===
 
@@ -315,12 +167,19 @@ function buildSpatialGrid() {
     }
 }
 
-function getNodesAt(x, y) {
-    if (!spatialGrid) return canvasData.nodes;
-    const col = Math.floor(x / GRID_CELL_SIZE);
-    const row = Math.floor(y / GRID_CELL_SIZE);
-    const key = `${col},${row}`;
-    return spatialGrid[key] || [];
+function findNodeAt(x, y) {
+    let candidates = [];
+    if (!spatialGrid) candidates = canvasData.nodes;
+    else {
+        const col = Math.floor(x / GRID_CELL_SIZE);
+        const row = Math.floor(y / GRID_CELL_SIZE);
+        const key = `${col},${row}`;
+        candidates = spatialGrid[key] || [];
+    }
+    for (const node of candidates) {
+        if (x < node.x || x > node.x + node.width || y < node.y || y > node.y + node.height || overlayJudger(node) === 0) continue;
+        return node;
+    }
 }
 
 // === Draw ===
@@ -843,6 +702,7 @@ function updateScale(newScale) {
     requestDraw();
 }
 
+// === Preview Modal ===
 function createPreviewModal(content, type) {
     const modal = document.createElement('div');
     modal.className = 'canvas-preview-modal';
@@ -868,3 +728,241 @@ function createPreviewModal(content, type) {
     document.body.appendChild(backdrop);
     document.body.appendChild(modal);
 }
+
+function getTouchDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+function getTouchMidpoint(touches) {
+    return {
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2
+    };
+}
+
+// #region Mouse/Touch Event
+function onWindowMouseDown(eve, touch = false) {
+    if (isUIControl(eve.target)) return;
+    const e = touch ? eve.touches[0] : eve;
+    if (touch) {
+        if (eve.touches.length > 1) {
+            pinchZoomState.isPinching = true;
+            pinchZoomState.initialDistance = getTouchDistance(eve.touches);
+            pinchZoomState.initialScale = scale;
+            pinchZoomState.initialMidpoint = getTouchMidpoint(eve.touches);
+            pinchZoomState.lastTouches = [eve.touches[0], eve.touches[1]];
+            pinchZoomState.lastMidpointX = pinchZoomState.initialMidpoint.x;
+            pinchZoomState.lastMidpointY = pinchZoomState.initialMidpoint.y;
+            dragState.isDragging = false;
+        } else {
+            overlayState.isHoveringSelectedOverlay = false;
+            const worldCoords = pointerAtWorld(e);
+            const node = findNodeAt(worldCoords.x, worldCoords.y);
+            if (node && node.id === overlayState.selectedOverlayId) overlayState.isHoveringSelectedOverlay = true;
+            if (overlayState.isHoveringSelectedOverlay) return;
+            dragState.lastTouchPoint = eve;
+            dragState.isDragging = true;
+            dragState.lastX = e.clientX;
+            dragState.lastY = e.clientY;
+            dragState.lastClientX = e.clientX;
+            dragState.lastClientY = e.clientY;
+        }
+    } else {
+        if (overlayState.isHoveringSelectedOverlay) return;
+        dragState.isDragging = true;
+        dragState.lastX = e.clientX;
+        dragState.lastY = e.clientY;
+        dragState.lastClientX = e.clientX;
+        dragState.lastClientY = e.clientY;
+    }
+}
+
+const onWindowMouseMove = throttle((eve, touch = false) => {
+    if (!dragState.isDragging && !pinchZoomState.isPinching) return;
+    if (dragState.isDragging) {
+        const e = touch ? eve.touches[0] : eve;
+        const dx = e.clientX - dragState.lastClientX;
+        const dy = e.clientY - dragState.lastClientY;
+        offsetX += dx;
+        offsetY += dy;
+        dragState.lastClientX = e.clientX;
+        dragState.lastClientY = e.clientY;
+        if (touch) dragState.lastTouchPoint = eve;
+    } else if (pinchZoomState.isPinching && touch) {
+        const newDistance = getTouchDistance(eve.touches);
+        let zoomFactor = newDistance / pinchZoomState.initialDistance;
+        let newScale = Math.max(0.05, Math.min(20, pinchZoomState.initialScale * zoomFactor));
+        // Calculate world coordinates at midpoint before zoom
+        const rect = canvas.getBoundingClientRect();
+        const midpoint = getTouchMidpoint(eve.touches);
+        const screenX = midpoint.x - rect.left;
+        const screenY = midpoint.y - rect.top;
+        const worldX = (screenX - offsetX) / scale;
+        const worldY = (screenY - offsetY) / scale;
+        // Update scale and offset so midpoint stays fixed
+        scale = newScale;
+        offsetX = screenX - worldX * scale - pinchZoomState.lastMidpointX + midpoint.x;
+        offsetY = screenY - worldY * scale - pinchZoomState.lastMidpointY + midpoint.y;
+        zoomSlider.value = scaleToSlider(scale);
+        pinchZoomState.lastMidpointX = midpoint.x;
+        pinchZoomState.lastMidpointY = midpoint.y;
+    }
+    requestDraw();
+}, 16)
+
+function onWindowMouseUp(eve, touch = false, lag = false) {
+    if (touch && eve.touches.length === 1 && !lag) {
+        const e = eve.touches[0];
+        pinchZoomState.isPinching = false;
+        dragState.lastTouchPoint = eve;
+        dragState.lastClientX = e.clientX;
+        dragState.lastClientY = e.clientY;
+        dragState.isDragging = true;
+        return;
+    }
+    if (!dragState.isDragging) return;
+    dragState.isDragging = false;
+    if ((dragState.lastClientX - dragState.lastX) ** 2 + (dragState.lastClientY - dragState.lastY) ** 2 > 25) return;
+    const e = touch ? eve.touches[0] : eve;
+    const worldCoords = pointerAtWorld(e);
+    const node = findNodeAt(worldCoords.x, worldCoords.y);
+    if (overlayJudger(node) === 1) select(node.id);
+    else select(null);
+    if (overlayJudger(node) !== 2) return;
+    if (node.type === 'file') {
+        if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {
+            const img = new Image();
+            img.src = canvasBaseDir + node.file;
+            img.className = 'canvas-preview-img';
+            const backdrop = document.createElement('div');
+            backdrop.className = 'canvas-preview-backdrop';
+            const closePreview = () => {
+                document.body.removeChild(img);
+                document.body.removeChild(backdrop);
+            };
+            img.onclick = closePreview;
+            backdrop.onclick = closePreview;
+            document.body.appendChild(backdrop);
+            document.body.appendChild(img);
+        } else if (node.file.match(/\.mp3$/i)) {
+            const audio = document.createElement('audio');
+            audio.controls = true;
+            audio.src = canvasBaseDir + node.file;
+            audio.style.width = '300px';
+            createPreviewModal(audio, 'audio');
+        }
+    }
+}
+
+function select(id) {
+    const previous = overlayState.selectedOverlayId === null ? null : document.getElementById(overlayState.selectedOverlayId);
+    const current = id === null ? null : document.getElementById(id);
+    if (previous) {
+        previous.classList.remove('active');
+        if (previous._hasHoverListeners) {
+            previous.removeEventListener('mouseenter', previous._mouseenterHandler);
+            previous.removeEventListener('mouseleave', previous._mouseleaveHandler);
+            previous._hasHoverListeners = false;
+        }
+    }
+    if (current) {
+        current.classList.add('active');
+        overlayState.isHoveringSelectedOverlay = true;
+        if (!current._hasHoverListeners) {
+            current._mouseenterHandler = () => overlayState.isHoveringSelectedOverlay = true;
+            current._mouseleaveHandler = () => overlayState.isHoveringSelectedOverlay = false;
+            current.addEventListener('mouseenter', current._mouseenterHandler);
+            current.addEventListener('mouseleave', current._mouseleaveHandler);
+            current._hasHoverListeners = true;
+        }
+    } else overlayState.isHoveringSelectedOverlay = false;
+    overlayState.selectedOverlayId = id;
+}
+
+function onTouch(e, state) {
+    if (!isUIControl(e.target) && (!overlayState.isHoveringSelectedOverlay || (overlayState.isHoveringSelectedOverlay && e.touches.length > 1))) e.preventDefault();
+    if (state === 'start') onWindowMouseDown(e, true);
+    else if (state === 'move') onWindowMouseMove(e, true);
+    else if (state === 'end') {
+        if (pinchZoomState.isPinching) onWindowMouseUp(e, true);
+        else onWindowMouseUp(dragState.lastTouchPoint, true, true);
+    }
+}
+// #endregion
+
+// #region Wheel Event
+const normalWheel = throttle((e) => {
+    if (Math.abs(e.deltaX) > 0 && !e.ctrlKey) touchPadMode = true;
+    if (overlayState.isHoveringSelectedOverlay && (!touchPadMode || (touchPadMode && Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.ctrlKey))) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const worldX = (mouseX - offsetX) / scale;
+    const worldY = (mouseY - offsetY) / scale;
+    // Zoom if ctrlKey or vertical wheel
+    if (!touchPadMode || e.ctrlKey) {
+        let zoomFactor = 1.06;
+        let newScale = scale;
+        if (e.deltaY < 0) newScale *= zoomFactor;
+        else newScale /= zoomFactor;
+        newScale = Math.max(0.05, Math.min(20, newScale));
+        offsetX = mouseX - worldX * newScale;
+        offsetY = mouseY - worldY * newScale;
+        scale = newScale;
+        zoomSlider.value = scaleToSlider(scale);
+    } else {
+        offsetX -= e.deltaX;
+        offsetY -= e.deltaY;
+    }
+    requestDraw();
+}, 16)
+
+function onWheel(e) {
+    if (e.ctrlKey) {
+        e.preventDefault();
+        touchPadMode = true;
+    }
+    normalWheel(e);
+}
+
+window.addEventListener('wheel', onWheel, { passive: false });
+// #endregion
+
+// #region Init
+window.addEventListener('mousedown', onWindowMouseDown);
+window.addEventListener('mousemove', onWindowMouseMove);
+window.addEventListener('mouseup', onWindowMouseUp);
+window.addEventListener('touchstart', (e) => onTouch(e, 'start'), { passive: false });
+window.addEventListener('touchmove', (e) => onTouch(e, 'move'), { passive: false });
+window.addEventListener('touchend', (e) => onTouch(e, 'end'), { passive: false });
+window.addEventListener('resize', onWindowResize);
+initCanvas();
+const zoomSlider = document.getElementById('zoom-slider');
+const toggleMinimapBtn = document.getElementById('toggle-minimap');
+document.getElementById('zoom-in').addEventListener('click', () => updateScale(scale * 1.2));
+document.getElementById('zoom-out').addEventListener('click', () => updateScale(scale / 1.2));
+zoomSlider.addEventListener('input', (e) => updateScale(Math.pow(1.1, e.target.value)));
+document.getElementById('reset-view').addEventListener('click', setInitialView);
+toggleMinimapBtn.addEventListener('click', () => {
+    isMinimapVisible = !isMinimapVisible;
+    document.getElementsByClassName('minimap-container')[0].classList.toggle('collapsed')
+    if (isMinimapVisible) updateViewportRectangle();
+});
+const controlsPanel = document.getElementById('controls');
+const toggleCollapseBtn = document.getElementById('toggle-collapse');
+toggleCollapseBtn.addEventListener('click', () => { controlsPanel.classList.toggle('collapsed') });
+
+// === Fullscreen ===
+const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
+function updateFullscreenButton() {
+    if (document.fullscreenElement === document.documentElement) toggleFullscreenBtn.textContent = '🡼';
+    else toggleFullscreenBtn.textContent = '⛶';
+}
+toggleFullscreenBtn.addEventListener('click', () => {
+    if (document.fullscreenElement !== document.documentElement) document.documentElement.requestFullscreen();
+    else document.exitFullscreen();
+});
+document.addEventListener('fullscreenchange', updateFullscreenButton);
+updateFullscreenButton();
+// #endregion

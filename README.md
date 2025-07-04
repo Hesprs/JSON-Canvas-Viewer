@@ -1,4 +1,4 @@
-# Obsidian Canvas Web Renderer X Version 1.3.0
+# Obsidian Canvas Web Renderer X Version 1.3.1
 
 A **web-based** viewer for **Obsidian Canvas** files that allows you to view and interact with your canvas files directly in the browser. Using this tool, you can embed interactive canvas to your front-end projects with ease. See **demo** at https://hesprs.github.io/canvas_demo.
 
@@ -26,20 +26,20 @@ View Obsidian Canvas files (`.canvas`, go to [JSON Canvas](https://jsoncanvas.or
     - Group nodes with custom colors
 - Edge connections between nodes with labels
 - Minimap for easy navigation
-- Responsive design and mobile adaption (unable to zoom using two fingers on mobile devices since it's always intercepted by browser default zooming)
-- 🔥**Much more performant** than rendering canvas in Obsidian!
+- Responsive design with mobile and touchpad adaption
+- 🔥**More performant** than rendering canvas in Obsidian!
 
 ## 🔦 Usage
 
 1. Start a localhost at any port from the root directory (you can use tools like Live Server)
 2. Visit your host through URL with parameter (optional), or you can embed it in an `iframe` in your own project and access it through file path of the `index.html` + parameter (optional)
-    - The parameter is the relative path pointing to the `.canvas` file, so the URL should be like `http://localhost:5500/?path=example/introduction.canvas` or the `src` of your `iframe` should be like `/path/to/modules/Obsidian-Canvas-Web-Renderer-X/index.html?path=/path/to/canvas/your.canvas`, you should put all the related files in the same directory as the `.canvas` file.
+    - The parameter is the relative path pointing to the `.canvas` file, so the URL should be like `http://localhost:5500/?path=example/introduction.canvas` or the `src` of your `iframe` should be like `/path/to/Obsidian-Canvas-Web-Renderer-X/index.html?path=/path/to/your.canvas`, you should put all the related files in the same directory as the `.canvas` file.
     - If there's no parameter, the application will open the example canvas (`introduction.canvas`).
     - Or you can simply put your `.canvas` file with related files in the `example` directory and name it as `introduction.canvas`.
 3. Click on a node to select and interact with it
 4. Navigate the canvas using:
-    - Drag to pan
-    - Scroll to zoom
+    - Drag / two fingers moving on the touchpad to pan
+    - Scroll / two fingers pinching on the touchpad or screen to zoom
 5. Use the control panel to:
     - Zoom in/out
     - Reset view
@@ -54,7 +54,7 @@ Improvements compared with [sofanati-nour/obsidian-canvas-web-renderer](https://
 - **UI fix**: the control panel is now positioned correctly.
 - **Movement Synchronization**: there's no weird delay when the link nodes move with the canvas.
 - **Text node spacing**: texts in text nodes don't overflow out of the nodes now.
-- **Mistouching prevention**: you don't need to care about your mouse / finger selects text or opens an image when you intend to pan the canvas; or the canvas still follows your pointer which has left the window.
+- **Mistouching prevention**: you don't need to care about your mouse / finger selects text or opens an image when you intend to pan the canvas.
 - **Zoom slider fix**: the slider is positioned to match the correct scale when opening a canvas.
 
 **Enhancements**:
@@ -69,13 +69,12 @@ Improvements compared with [sofanati-nour/obsidian-canvas-web-renderer](https://
 - **Better paths**: optimize the curved path stiffness logic.
 - **Straightforward control**: the default behaviour of mouse wheel is zooming rather than vertical scrolling.
 - **Simple aesthetics**: nodes now have round corners and labels can adjust their width based on their text and zoom with the canvas. Styles have been reconstructed for better aesthetics and supporting more markdown elements.
-- **Mobile adaption (experimental)**: enable panning & zooming using touch.
-- **Super robustness**: the application won't collapse if there's missing file.
+- **Device adaption**: enable panning & zooming using fingers and touchpad.
+- **Super robustness**: the application won't collapse if there're missing files.
 - **Refactor**: Large refactor & reconstruction for reusability and readability.
 - **Various performance improvements**:
     - Throttling
-    - Spatial grid for canvas more than 200 nodes
-    - Updating minimap based on hash change
+    - Spatial grid for canvas more than 50 nodes
     - Integrated DOM overlay zooming & panning
     - Remove DOM overlay node from DOM when out of the viewport
     - Image & markdown file lazy load
