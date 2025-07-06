@@ -1,14 +1,14 @@
-# Obsidian Canvas Web Renderer X Version 1.3.1
+# Obsidian Canvas Web Renderer X Version 1.3.2
 
 A **web-based** viewer for **Obsidian Canvas** files that allows you to view and interact with your canvas files directly in the browser. Using this tool, you can embed interactive canvas to your front-end projects with ease. See **demo** at https://hesprs.github.io/canvas_demo.
 
-![App interface](https://img1.tucang.cc/api/image/show/72e975b6d6cbd6436300b3d86fe26f91)
+![Preview](preview.png)
 
-This project is modified from [sofanati-nour/obsidian-canvas-web-renderer](https://github.com/sofanati-nour/obsidian-canvas-web-renderer), which is insightful, containing proficient expertise but also buggy and unable to use directly. So this project comes with supercharging, making it possible to be put into practical uses. All-round enhances were applied and more than 80% of the code is modified or added.
+This project is modified from [sofanati-nour/obsidian-canvas-web-renderer](https://github.com/sofanati-nour/obsidian-canvas-web-renderer), which represents proficient expertise yet buggy and unable to use directly. So this project comes with further development, making it possible to be put into production uses.
 
 | Titles                   | Information                                     |
 | ------------------------ | ----------------------------------------------- |
-| Technology stack         | HTML Canvas, Vanilla JavaScript                 |
+| Technology stack         | HTML Canvas, JavaScript, SCSS                   |
 | Open-source project used | Marked.js, Obsidian Canvas Web Renderer         |
 | Major Enhancements       | Experience & Bug fix & Performance & Aesthetics |
 | License                  | MIT License                                     |
@@ -55,20 +55,19 @@ Improvements compared with [sofanati-nour/obsidian-canvas-web-renderer](https://
 - **Movement Synchronization**: there's no weird delay when the link nodes move with the canvas.
 - **Text node spacing**: texts in text nodes don't overflow out of the nodes now.
 - **Mistouching prevention**: you don't need to care about your mouse / finger selects text or opens an image when you intend to pan the canvas.
-- **Zoom slider fix**: the slider is positioned to match the correct scale when opening a canvas.
+- **Zoom slider fix**: the slider is adjusted to match the correct scale when opening a canvas.
 
 **Enhancements**:
 - **Full markdown syntax support**: use marked.js to parse all the markdown-related text to enable tables, images, titles, codes, dividing lines and videos to be displayed in markdown & text nodes.
 - **Supercharged text nodes**: use the overlay DOM to render all text nodes, which improves reactivity and resolution, and fixes crucial bugs.
-- **Overlay Isolation**: Isolating the DOM overlay with mouse / touch events enables you to drag & zoom anywhere on the canvas, providing convenient & continuous experience.
+- **Overlay Isolation**: Isolating the DOM overlay with mouse / touch events enables you to drag & zoom anywhere on the canvas, providing convenient & continuous experience; a node is interactive only when "selected", working the same way as in Obsidian.
 - **Custom file path (experimental)**: allow custom `.canvas` path asigned by URL parameter.
-- **Fullscreen support**: there's now a fullscreen button in the control panel.
-- **Zooming origin**: the canvas now zooms toward / backward the mouse pointer.
-- **Selection**: a node is interactive only when "selected", working the same way as in Obsidian.
+- **Fullscreen support**: there's a fullscreen button in the control panel.
+- **Zooming origin**: the canvas zooms toward / backward the mouse pointer.
 - **Smart dragging**: the app can distinguish whether you want to pan the canvas or select a node.
 - **Better paths**: optimize the curved path stiffness logic.
-- **Straightforward control**: the default behaviour of mouse wheel is zooming rather than vertical scrolling.
-- **Simple aesthetics**: nodes now have round corners and labels can adjust their width based on their text and zoom with the canvas. Styles have been reconstructed for better aesthetics and supporting more markdown elements.
+- **Intuitive control**: the default behaviour of mouse wheel is zooming rather than vertical scrolling.
+- **Simple aesthetics**: nodes have round corners and labels can adjust their width based on their text and zoom with the canvas. Styles have been reconstructed for better aesthetics and supporting more markdown elements.
 - **Device adaption**: enable panning & zooming using fingers and touchpad.
 - **Super robustness**: the application won't collapse if there're missing files.
 - **Refactor**: Large refactor & reconstruction for reusability and readability.

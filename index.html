@@ -10,21 +10,38 @@
     <canvas id="myCanvas" width="1000" height="600"></canvas>
     <div id="overlays"></div>
     <div class="minimap-container">
-        <button id="toggle-minimap" class="square collapse-button">‹</button>
-        <div id="minimap-container">
-            <canvas id="minimap" width="200" height="150"></canvas>
+        <button id="toggle-minimap" class="collapse-button">
+            <svg viewBox="-3.6 -3.6 31.2 31.2" stroke-width=".4"><path d="M15.707 4.293a1 1 0 0 1 0 1.414L9.414 12l6.293 6.293a1 1 0 0 1-1.414 1.414l-7-7a1 1 0 0 1 0-1.414l7-7a1 1 0 0 1 1.414 0Z"/></svg>
+        </button>
+        <div id="minimap">
+            <canvas id="minimap-canvas" width="200" height="150"></canvas>
             <div id="viewport-rectangle"></div>
         </div>
     </div>
     <div id="controls">
-        <button id="toggle-collapse" class="square collapse-button">‹</button>
+        <button id="toggle-collapse" class="collapse-button">
+            <svg viewBox="-3.6 -3.6 31.2 31.2" stroke-width=".4"><path d="M15.707 4.293a1 1 0 0 1 0 1.414L9.414 12l6.293 6.293a1 1 0 0 1-1.414 1.414l-7-7a1 1 0 0 1 0-1.414l7-7a1 1 0 0 1 1.414 0Z"/></svg>
+        </button>
         <div id="controls-content">
-            <button id="toggle-fullscreen" class="square">⛶</button>
-            <button id="zoom-out" class="square">-</button>
+            <button id="toggle-fullscreen"></button>
+            <button id="zoom-out">
+                <svg viewBox="-1.2 -1.2 26.4 26.4"><path d="M6 12h12" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
             <input type="range" id="zoom-slider" min="-30" max="30" value="0">
-            <button id="zoom-in" class="square">+</button>
-            <button id="reset-view" class="square">↻</button>
+            <button id="zoom-in">
+                <svg viewBox="-1.2 -1.2 26.4 26.4"><path d="M6 12h12m-6-6v12" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+            <button id="reset-view">
+                <svg viewBox="-6 -6 30 30" stroke-width=".08"><path d="m14.955 7.986.116.01a1 1 0 0 1 .85 1.13 8 8 0 0 1-13.374 4.728l-.84.84c-.63.63-1.707.184-1.707-.707V10h3.987c.89 0 1.337 1.077.707 1.707l-.731.731a6 6 0 0 0 8.347-.264 6 6 0 0 0 1.63-3.33 1 1 0 0 1 1.131-.848zM11.514.813a8 8 0 0 1 1.942 1.336l.837-.837c.63-.63 1.707-.184 1.707.707V6h-3.981c-.89 0-1.337-1.077-.707-1.707l.728-.729a6 6 0 0 0-9.98 3.591 1 1 0 1 1-1.98-.281A8 8 0 0 1 11.514.813Z"/></svg>
+            </button>
         </div>
+    </div>
+    <div id="preview-modal-backdrop" class="preview-modal-backdrop hidden"></div>
+    <div id="preview-modal" class="preview-modal hidden">
+        <button id="preview-modal-close" class="preview-modal-close">
+            <svg viewBox="0 0 24 24"><path d="M6.758 17.243 12.001 12m5.243-5.243L12 12m0 0L6.758 6.757M12.001 12l5.243 5.243" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div id="preview-modal-content" class="preview-modal-content"></div>
     </div>
     <script src="marked.js"></script>
     <script src="app.js"></script>

@@ -1,10 +1,13 @@
-// V 1.3.1
+// v1.3.2
+
+// === Preview Modal State ===
+let isPreviewModalOpen = false;
 
 const nodeMap = {};
 const canvas = document.getElementById('myCanvas');
 const ctx = canvas.getContext('2d');
 const overlaysLayer = document.getElementById('overlays');
-const minimap = document.getElementById('minimap');
+const minimap = document.getElementById('minimap-canvas');
 const minimapCtx = minimap.getContext('2d');
 const overlays = {};
 
@@ -87,6 +90,8 @@ async function initCanvas() {
 }
 
 const throttle = function(func, interval) {
+    let timeout = null;
+    let lastArgs = null;
     let lastCallTime = -Infinity;
     return function throttled(...args) {
         const now = Date.now();
@@ -94,6 +99,15 @@ const throttle = function(func, interval) {
         if (timeSinceLast >= interval) {
             func.apply(this, args);
             lastCallTime = now;
+        } else {
+            lastArgs = args;
+            if (!timeout) {
+                timeout = setTimeout(() => {
+                    func.apply(this, lastArgs);
+                    lastCallTime = Date.now();
+                    timeout = null;
+                }, interval - timeSinceLast);
+            }
         }
     };
 }
@@ -438,6 +452,7 @@ function createOverlayElement(type, node) {
         iframe.src = node.url;
         iframe.sandbox = 'allow-scripts allow-same-origin';
         iframe.className = 'link-iframe';
+        iframe.loading = 'lazy';
         const clickLayer = document.createElement('div');
         clickLayer.className = 'link-click-layer';
         element.appendChild(iframe);
@@ -625,7 +640,7 @@ function updateViewportRectangle() {
     if (!isMinimapVisible) return;
     const bounds = calculateNodesBounds();
     if (!bounds) return;
-    const minimap = document.getElementById('minimap');
+    const minimap = document.getElementById('minimap-canvas');
     const contentWidth = bounds.maxX - bounds.minX;
     const contentHeight = bounds.maxY - bounds.minY;
     const scaleX = minimap.width / contentWidth;
@@ -644,7 +659,6 @@ function updateViewportRectangle() {
     const viewRectWidth = viewWidth * minimapScale;
     const viewRectHeight = viewHeight * minimapScale;
     const viewportRect = document.getElementById('viewport-rectangle');
-    viewportRect.style.display = isMinimapVisible ? 'block' : 'none';
     viewportRect.style.left = viewRectX + 'px';
     viewportRect.style.top = viewRectY + 'px';
     viewportRect.style.width = viewRectWidth + 'px';
@@ -703,30 +717,18 @@ function updateScale(newScale) {
 }
 
 // === Preview Modal ===
-function createPreviewModal(content, type) {
-    const modal = document.createElement('div');
-    modal.className = 'canvas-preview-modal';
-    const backdrop = document.createElement('div');
-    backdrop.className = 'canvas-preview-backdrop';
-    const closeButton = document.createElement('button');
-    closeButton.className = 'canvas-preview-close';
-    closeButton.textContent = '×';
-    modal.appendChild(closeButton);
-    if (type === 'audio') modal.appendChild(content);
-    else if (type === 'markdown') {
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'canvas-preview-content';
-        contentDiv.innerHTML = content;
-        modal.appendChild(contentDiv);
-    }
-    const closeModal = () => {
-        document.body.removeChild(modal);
-        document.body.removeChild(backdrop);
-    };
-    closeButton.onclick = closeModal;
-    backdrop.onclick = closeModal;
-    document.body.appendChild(backdrop);
-    document.body.appendChild(modal);
+function showPreviewModal(content) {
+    previewModalContent.innerHTML = '';
+    isPreviewModalOpen = true;
+    previewModalBackdrop.classList.remove('hidden');
+    previewModal.classList.remove('hidden');
+    previewModalContent.appendChild(content);
+}
+
+function hidePreviewModal() {
+    isPreviewModalOpen = false;
+    previewModalBackdrop.classList.add('hidden');
+    previewModal.classList.add('hidden');
 }
 
 function getTouchDistance(touches) {
@@ -743,6 +745,7 @@ function getTouchMidpoint(touches) {
 
 // #region Mouse/Touch Event
 function onWindowMouseDown(eve, touch = false) {
+    if (isPreviewModalOpen) return;
     if (isUIControl(eve.target)) return;
     const e = touch ? eve.touches[0] : eve;
     if (touch) {
@@ -779,6 +782,7 @@ function onWindowMouseDown(eve, touch = false) {
 }
 
 const onWindowMouseMove = throttle((eve, touch = false) => {
+    if (isPreviewModalOpen) return;
     if (!dragState.isDragging && !pinchZoomState.isPinching) return;
     if (dragState.isDragging) {
         const e = touch ? eve.touches[0] : eve;
@@ -812,6 +816,7 @@ const onWindowMouseMove = throttle((eve, touch = false) => {
 }, 16)
 
 function onWindowMouseUp(eve, touch = false, lag = false) {
+    if (isPreviewModalOpen) return;
     if (touch && eve.touches.length === 1 && !lag) {
         const e = eve.touches[0];
         pinchZoomState.isPinching = false;
@@ -832,25 +837,15 @@ function onWindowMouseUp(eve, touch = false, lag = false) {
     if (overlayJudger(node) !== 2) return;
     if (node.type === 'file') {
         if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {
+            isPreviewModalOpen = true;
             const img = new Image();
             img.src = canvasBaseDir + node.file;
-            img.className = 'canvas-preview-img';
-            const backdrop = document.createElement('div');
-            backdrop.className = 'canvas-preview-backdrop';
-            const closePreview = () => {
-                document.body.removeChild(img);
-                document.body.removeChild(backdrop);
-            };
-            img.onclick = closePreview;
-            backdrop.onclick = closePreview;
-            document.body.appendChild(backdrop);
-            document.body.appendChild(img);
+            showPreviewModal(img);
         } else if (node.file.match(/\.mp3$/i)) {
             const audio = document.createElement('audio');
             audio.controls = true;
             audio.src = canvasBaseDir + node.file;
-            audio.style.width = '300px';
-            createPreviewModal(audio, 'audio');
+            showPreviewModal(audio);
         }
     }
 }
@@ -881,6 +876,7 @@ function select(id) {
 }
 
 function onTouch(e, state) {
+    if (isPreviewModalOpen) return;
     if (!isUIControl(e.target) && (!overlayState.isHoveringSelectedOverlay || (overlayState.isHoveringSelectedOverlay && e.touches.length > 1))) e.preventDefault();
     if (state === 'start') onWindowMouseDown(e, true);
     else if (state === 'move') onWindowMouseMove(e, true);
@@ -893,7 +889,8 @@ function onTouch(e, state) {
 
 // #region Wheel Event
 const normalWheel = throttle((e) => {
-    if (Math.abs(e.deltaX) > 0 && !e.ctrlKey) touchPadMode = true;
+    if (isPreviewModalOpen) return;
+    if (Math.abs(e.deltaX) > 0 && !e.ctrlKey && !touchPadMode) touchPadMode = true;
     if (overlayState.isHoveringSelectedOverlay && (!touchPadMode || (touchPadMode && Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.ctrlKey))) return;
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
@@ -919,10 +916,9 @@ const normalWheel = throttle((e) => {
 }, 16)
 
 function onWheel(e) {
-    if (e.ctrlKey) {
-        e.preventDefault();
-        touchPadMode = true;
-    }
+    if (isPreviewModalOpen) return;
+    if (e.ctrlKey && !touchPadMode) touchPadMode = true;
+    if (e.ctrlKey || (touchPadMode && Math.abs(e.deltaY) < Math.abs(e.deltaX))) e.preventDefault();
     normalWheel(e);
 }
 
@@ -956,8 +952,12 @@ toggleCollapseBtn.addEventListener('click', () => { controlsPanel.classList.togg
 // === Fullscreen ===
 const toggleFullscreenBtn = document.getElementById('toggle-fullscreen');
 function updateFullscreenButton() {
-    if (document.fullscreenElement === document.documentElement) toggleFullscreenBtn.textContent = '🡼';
-    else toggleFullscreenBtn.textContent = '⛶';
+    if (document.fullscreenElement === document.documentElement) toggleFullscreenBtn.innerHTML = `
+        <svg viewBox="-40.32 -40.32 176.64 176.64"><path d="M30 60H6a6 6 0 0 0 0 12h18v18a6 6 0 0 0 12 0V66a5.997 5.997 0 0 0-6-6Zm60 0H66a5.997 5.997 0 0 0-6 6v24a6 6 0 0 0 12 0V72h18a6 6 0 0 0 0-12ZM66 36h24a6 6 0 0 0 0-12H72V6a6 6 0 0 0-12 0v24a5.997 5.997 0 0 0 6 6ZM30 0a5.997 5.997 0 0 0-6 6v18H6a6 6 0 0 0 0 12h24a5.997 5.997 0 0 0 6-6V6a5.997 5.997 0 0 0-6-6Z"/></svg>
+    `;
+    else toggleFullscreenBtn.innerHTML = `
+        <svg viewBox="-5.28 -5.28 34.56 34.56" fill="none"><path d="M4 9V5.6c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 4 5.04 4 5.6 4H9M4 15v3.4c0 .56 0 .84.109 1.054a1 1 0 0 0 .437.437C4.76 20 5.04 20 5.6 20H9m6-16h3.4c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C20 4.76 20 5.04 20 5.6V9m0 6v3.4c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437C19.24 20 18.96 20 18.4 20H15" stroke-width="2.4" stroke-linecap="round"/></svg>
+    `;
 }
 toggleFullscreenBtn.addEventListener('click', () => {
     if (document.fullscreenElement !== document.documentElement) document.documentElement.requestFullscreen();
@@ -965,4 +965,13 @@ toggleFullscreenBtn.addEventListener('click', () => {
 });
 document.addEventListener('fullscreenchange', updateFullscreenButton);
 updateFullscreenButton();
+
+// === Preview Modal ===
+const previewModal = document.getElementById('preview-modal');
+const previewModalBackdrop = document.getElementById('preview-modal-backdrop');
+const previewModalClose = document.getElementById('preview-modal-close');
+const previewModalContent = document.getElementById('preview-modal-content');
+
+previewModalClose.addEventListener('click', hidePreviewModal);
+previewModalBackdrop.addEventListener('click', hidePreviewModal);
 // #endregion
