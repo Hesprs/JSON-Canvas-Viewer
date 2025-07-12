@@ -1,4 +1,4 @@
-# Obsidian Canvas Web Renderer X Version 1.3.2
+# Obsidian Canvas Web Renderer X v1.4.0
 
 A **web-based** viewer for **Obsidian Canvas** files that allows you to view and interact with your canvas files directly in the browser. Using this tool, you can embed interactive canvas to your front-end projects with ease. See **demo** at https://hesprs.github.io/canvas_demo.
 
@@ -54,6 +54,7 @@ Improvements compared with [sofanati-nour/obsidian-canvas-web-renderer](https://
 - **UI fix**: the control panel is now positioned correctly.
 - **Movement Synchronization**: there's no weird delay when the link nodes move with the canvas.
 - **Text node spacing**: texts in text nodes don't overflow out of the nodes now.
+- **High-Res rendering**: the canvas adjusts it's resolution according to the device's DPR for pixel-precise rendering, improvement is most significant on mobile devices.
 - **Mistouching prevention**: you don't need to care about your mouse / finger selects text or opens an image when you intend to pan the canvas.
 - **Zoom slider fix**: the slider is adjusted to match the correct scale when opening a canvas.
 
@@ -67,12 +68,18 @@ Improvements compared with [sofanati-nour/obsidian-canvas-web-renderer](https://
 - **Smart dragging**: the app can distinguish whether you want to pan the canvas or select a node.
 - **Better paths**: optimize the curved path stiffness logic.
 - **Intuitive control**: the default behaviour of mouse wheel is zooming rather than vertical scrolling.
-- **Simple aesthetics**: nodes have round corners and labels can adjust their width based on their text and zoom with the canvas. Styles have been reconstructed for better aesthetics and supporting more markdown elements.
 - **Device adaption**: enable panning & zooming using fingers and touchpad.
-- **Super robustness**: the application won't collapse if there're missing files.
+- **Super robustness**: the application won't crash down if there're missing files.
 - **Refactor**: Large refactor & reconstruction for reusability and readability.
-- **Various performance improvements**:
-    - Throttling
+- **Aesthetics improvements**:
+    - Nodes have round corners and labels can adjust their width based on their text and zoom with the canvas.
+    - Styles for displaying content have been reconstructed for better aesthetics and supporting more markdown elements.
+    - The preview interface has been re-designed for minimalism and smoothness.
+    - Colours for nodes is derived form vanilla Obsidian palette.
+    - Add smooth transitions for wheel zooming, hovering & selecting nodes.
+    - Add glassmorphism effect to minimap.
+- **Performance improvements**:
+    - All calculation happens only before a new frame needs to be rendered
     - Spatial grid for canvas more than 50 nodes
     - Integrated DOM overlay zooming & panning
     - Remove DOM overlay node from DOM when out of the viewport

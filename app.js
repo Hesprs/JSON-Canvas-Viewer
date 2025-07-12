@@ -1,8 +1,6 @@
-// v1.3.2
+// v1.4.0
 
-// === Preview Modal State ===
-let isPreviewModalOpen = false;
-
+// #region Variables
 const nodeMap = {};
 const canvas = document.getElementById('myCanvas');
 const ctx = canvas.getContext('2d');
@@ -10,26 +8,29 @@ const overlaysLayer = document.getElementById('overlays');
 const minimap = document.getElementById('minimap-canvas');
 const minimapCtx = minimap.getContext('2d');
 const overlays = {};
-
+const dpr = window.devicePixelRatio || 1;
 let canvasData = null;
 let canvasBaseDir = null;
 let offsetX = canvas.width / 2;
 let offsetY = canvas.height / 2;
 let scale = 1.0;
+let targetScale = 1.0; // Target scale for smooth zooming
 let isMinimapVisible = true;
 let spatialGrid = null;
-let isRequesting = false;
 let touchPadMode = false;
-const GRID_CELL_SIZE = 300;
-const FONT_COLOR = '#fff';
+let isPreviewModalOpen = false;
+
 // Markdown and image cache
 const markdownCache = {};
-const imageCache = {};
 
 // === Constants ===
 const ARROW_LENGTH = 12;
 const ARROW_WIDTH = 7;
 const FILE_NODE_RADIUS = 12;
+const GRID_CELL_SIZE = 300;
+const FONT_COLOR = '#fff';
+const ZOOM_SMOOTHNESS = 0.4; // Adjust this value to control zoom smoothness (0-1)
+const ZOOM_FACTOR = 1.06;
 
 // === Grouped State Objects ===
 const dragState = {
@@ -56,62 +57,28 @@ const pinchZoomState = {
     lastMidpointY: 0
 };
 
-function overlayJudger(node) {
-    const type = node == undefined ? 'default' : node.type;
-    switch (type) {
-        case 'text': return 1;
-        case 'link': return 1;
-        case 'file': return node.file.match(/\.md$/i) ? 1 : 2;
-        default: return 0;
-    }
+const perFrame = {
+    needAnimating: true,
+    zoom: false,
+    zoomOrigin: {
+        x: 0,
+        y: 0,
+        screenX: 0,
+        screenY: 0,
+    },
+    wheelPan: false,
+    wheelPanEvent: null,
+    resize: false,
+    resizeScale: { width: 0, height: 0 },
+    mouseMove: false,
+    moveParams: {
+        e: null,
+        touch: false,
+    },
 }
+// #endregion
 
-// === Init ===
-async function initCanvas() {
-    try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const canvasPath = urlParams.get('path') ? decodeURIComponent(urlParams.get('path')) : 'example/introduction.canvas';
-        // Determine base directory for related files
-        if (/^https?:\/\//.test(canvasPath)) canvasBaseDir = canvasPath.substring(0, canvasPath.lastIndexOf('/') + 1);
-        else {
-            // Local or relative path
-            const lastSlash = canvasPath.lastIndexOf('/');
-            canvasBaseDir = lastSlash !== -1 ? canvasPath.substring(0, lastSlash + 1) : './';
-        }
-        canvasData = await fetch(canvasPath).then(res => res.json());
-        canvasData.nodes.forEach(node => { nodeMap[node.id] = node; });
-        buildSpatialGrid();
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        setInitialView();
-        requestDraw();
-        drawMinimap();
-    } catch (err) { console.error('Failed to load canvas data:', err) }
-}
-
-const throttle = function(func, interval) {
-    let timeout = null;
-    let lastArgs = null;
-    let lastCallTime = -Infinity;
-    return function throttled(...args) {
-        const now = Date.now();
-        const timeSinceLast = now - lastCallTime;
-        if (timeSinceLast >= interval) {
-            func.apply(this, args);
-            lastCallTime = now;
-        } else {
-            lastArgs = args;
-            if (!timeout) {
-                timeout = setTimeout(() => {
-                    func.apply(this, lastArgs);
-                    lastCallTime = Date.now();
-                    timeout = null;
-                }, interval - timeSinceLast);
-            }
-        }
-    };
-}
-
+// #region Utility Functions
 function getColor(colorIndex) {
     let themeColor = null;
     switch (colorIndex) {
@@ -143,11 +110,11 @@ function getColor(colorIndex) {
     }
 }
 
-const onWindowResize = throttle( () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    requestDraw();
-}, 16)
+function onWindowResize() {
+    perFrame.resize = true;
+    perFrame.resizeScale.width = window.innerWidth;
+    perFrame.resizeScale.height = window.innerHeight;
+}
 
 function isUIControl(target) {
     return target.closest && (
@@ -155,30 +122,6 @@ function isUIControl(target) {
         target.closest('button') ||
         target.closest('input')
     );
-}
-
-// === Utility Functions ===
-
-
-function buildSpatialGrid() {
-    if (!canvasData || canvasData.nodes.length < 50) {
-        spatialGrid = null;
-        return;
-    }
-    spatialGrid = {};
-    for (let node of canvasData.nodes) {
-        const minCol = Math.floor(node.x / GRID_CELL_SIZE);
-        const maxCol = Math.floor((node.x + node.width) / GRID_CELL_SIZE);
-        const minRow = Math.floor(node.y / GRID_CELL_SIZE);
-        const maxRow = Math.floor((node.y + node.height) / GRID_CELL_SIZE);
-        for (let col = minCol; col <= maxCol; col++) {
-            for (let row = minRow; row <= maxRow; row++) {
-                const key = `${col},${row}`;
-                if (!spatialGrid[key]) spatialGrid[key] = [];
-                spatialGrid[key].push(node);
-            }
-        }
-    }
 }
 
 function findNodeAt(x, y) {
@@ -196,32 +139,72 @@ function findNodeAt(x, y) {
     }
 }
 
-// === Draw ===
-function requestDraw() {
-    if (isRequesting) return;
-    isRequesting = true;
-    requestAnimationFrame(() => {
-        overlaysLayer.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#222';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.save();
-        ctx.translate(offsetX, offsetY);
-        ctx.scale(scale, scale);
-        // Cache viewport status for all nodes
-        canvasData.nodes.forEach(node => node._inViewport = isNodeInViewport(node));
-        canvasData.nodes.forEach(node => {
-            switch (node.type) {
-                case 'group': drawGroup(node); break;
-                case 'file': drawFileNode(node); break;
-            }
-        });
-        canvasData.edges.forEach(drawEdge);
-        ctx.restore();
-        updateAllOverlays();
-        updateViewportRectangle();
-        isRequesting = false;
+function pointerAtWorld(e) {
+    const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    return {
+        x: (screenX - offsetX) / scale,
+        y: (screenY - offsetY) / scale,
+        screenX: screenX,
+        screenY: screenY
+    };
+}
+
+function overlayJudger(node) { // how should the app handle the click of certain overlays
+    const type = node == undefined ? 'default' : node.type;
+    switch (type) {
+        case 'text': return 1;
+        case 'link': return 1;
+        case 'file': return node.file.match(/\.md$/i) ? 1 : 2;
+        default: return 0;
+    }
+}
+// #endregion
+
+// #region Draw
+// === Canvas ===
+function draw() {
+    if (!perFrame.needAnimating && !perFrame.wheelPan && !perFrame.resize && !perFrame.mouseMove && !perFrame.zoom) {
+        requestAnimationFrame(draw);
+        return;
+    }
+    if (perFrame.needAnimating) perFrame.needAnimating = false;
+    if (perFrame.wheelPan) wheelPan(perFrame.wheelPanEvent);
+    if (perFrame.zoom) smoothZoom();
+    if (perFrame.resize) {
+        perFrame.resize = false;
+        resizeCanvasForDPR(canvas, ctx, perFrame.resizeScale.width, perFrame.resizeScale.height);
+    }
+    if (perFrame.mouseMove) {
+        perFrame.mouseMove = false;
+        mouseMove(perFrame.moveParams.e, perFrame.moveParams.touch);
+    }
+    overlaysLayer.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+    // Cache viewport status for all nodes
+    canvasData.nodes.forEach(node => node._inViewport = isNodeInViewport(node));
+    canvasData.nodes.forEach(node => {
+        switch (node.type) {
+            case 'group': drawGroup(node); break;
+            case 'file': drawFileNode(node); break;
+        }
     });
+    canvasData.edges.forEach(drawEdge);
+    ctx.restore();
+    updateAllOverlays();
+    updateViewportRectangle();
+    requestAnimationFrame(draw);
+}
+
+function resizeCanvasForDPR(canvas, ctx, width, height) {
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset any existing transforms
+    ctx.scale(dpr, dpr);
 }
 
 function drawLabelBar(x, y, label, colors) {
@@ -287,7 +270,7 @@ function drawGroup(node) {
 }
 
 function drawFileNode(node) {
-    if (!node.file.match(/\.md$/i)) {
+    if (!node.file.match(/\.md|png|jpg|jpeg|gif|svg$/i)) {
         drawNodeBackground(node);
         if (node.file.match(/\.mp3$/i)) {
             ctx.fillStyle = FONT_COLOR;
@@ -300,171 +283,10 @@ function drawFileNode(node) {
     ctx.fillStyle = FONT_COLOR;
     ctx.font = '16px sans-serif';
     ctx.fillText(node.file, node.x + 5, node.y - 10);
-    if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {
-        if (node._inViewport) {
-            loadImageForNode(node);
-            if (node.imageElement && node.imageElement.complete) {
-                const x = node.x + 1;
-                const y = node.y + 1;
-                const drawWidth = node.width - 2;
-                const drawHeight = node.height - 2;
-                ctx.save();
-                drawRoundRect(ctx, x, y, drawWidth, drawHeight, FILE_NODE_RADIUS);
-                ctx.clip();
-                // Check for broken image
-                if (node.imageElement.naturalWidth === 0) {
-                    ctx.fillStyle = FONT_COLOR;
-                    ctx.font = '18px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('Image not found', x + drawWidth / 2, y + drawHeight / 2);
-                    ctx.textAlign = 'left';
-                } else ctx.drawImage(node.imageElement, x, y, drawWidth, drawHeight);
-                ctx.restore();
-            }
-        } else if (node.imageElement) node.imageElement = null;
-    } else if (node.file.match(/\.md$/i)) if (node._inViewport) loadMarkdownForNode(node);
-}
-
-function isNodeInViewport(node, margin = 200) {
-    const viewLeft = (-offsetX) / scale - margin;
-    const viewTop = (-offsetY) / scale - margin;
-    const viewRight = viewLeft + canvas.width / scale + 2 * margin;
-    const viewBottom = viewTop + canvas.height / scale + 2 * margin;
-    return (
-        node.x + node.width > viewLeft &&
-        node.x < viewRight &&
-        node.y + node.height > viewTop &&
-        node.y < viewBottom
-    );
-}
-
-// === Lazy Loading Utilities ===
-function loadImageForNode(node) {
-    if (!imageCache[node.file]) {
-        const img = new Image();
-        img.src = canvasBaseDir + node.file;
-        img.onload = requestDraw;
-        img.onerror = requestDraw;
-        imageCache[node.file] = img;
+    if (node._inViewport) {
+        if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) updateOrCreateOverlay(node, canvasBaseDir + node.file, 'image');
+        else if (node.file.match(/\.md$/i)) loadMarkdownForNode(node);
     }
-    node.imageElement = imageCache[node.file];
-}
-
-async function loadMarkdownForNode(node) {
-    if (!markdownCache[node.file]) {
-        markdownCache[node.file] = { status: 'loading', content: null, frontmatter: null };
-        try {
-            let result = await fetch(canvasBaseDir + node.file);
-            result = await result.text();
-            const frontmatterMatch = result.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-            if (frontmatterMatch) {
-                const frontmatter = frontmatterMatch[1].split('\n').reduce((acc, line) => {
-                    const [key, value] = line.split(':').map(s => s.trim());
-                    acc[key] = value;
-                    return acc;
-                }, {});
-                markdownCache[node.file] = { status: 'loaded', content: frontmatterMatch[2].trim(), frontmatter };
-            } else markdownCache[node.file] = { status: 'loaded', content: result, frontmatter: null };
-        } catch(err) {
-            console.error('Failed to load markdown:', err);
-            markdownCache[node.file] = { status: 'error', content: 'Failed to load content', frontmatter: null };
-        }
-    }
-    if (markdownCache[node.file].status === 'loaded') {
-        node.mdContent = markdownCache[node.file].content;
-        node.mdFrontmatter = markdownCache[node.file].frontmatter;
-    } else if (markdownCache[node.file].status === 'error') {
-        node.mdContent = markdownCache[node.file].content;
-        node.mdFrontmatter = null;
-    } else {
-        node.mdContent = 'Loading...';
-        node.mdFrontmatter = null;
-    }
-    updateOrCreateOverlay(node, node.mdContent, 'markdown');
-}
-
-function updateAllOverlays() {
-    const neededOverlays = new Set();
-    const overlayCreators = {
-        text: (node) => {
-            if (node._inViewport) {
-                neededOverlays.add(node.id);
-                updateOrCreateOverlay(node, node.text, 'text');
-            }
-        },
-        file: (node) => {
-            if (node.file.match(/\.md$/i) && node.mdContent && node._inViewport) {
-                neededOverlays.add(node.id);
-                updateOrCreateOverlay(node, node.mdContent, 'markdown');
-            }
-        },
-        link: (node) => {
-            neededOverlays.add(node.id);
-            updateOrCreateOverlay(node, node.url, 'link')
-        }
-    };
-    canvasData.nodes.forEach(node => {
-        if (overlayCreators[node.type]) overlayCreators[node.type](node);
-    });
-    Object.keys(overlays).forEach(id => {
-        if (!neededOverlays.has(id)) {
-            const div = overlays[id];
-            if (div && div.parentNode) div.parentNode.removeChild(div);
-            delete overlays[id];
-        }
-    });
-}
-
-function updateOrCreateOverlay(node, content, type) {
-    let element = overlays[node.id];
-    if (!element) {
-        element = createOverlayElement(type, node);
-        overlaysLayer.appendChild(element);
-        overlays[node.id] = element;
-        element.style.left = node.x + 'px';
-        element.style.top = node.y + 'px';
-        element.style.width = node.width + 'px';
-        element.style.height = node.height + 'px';
-    }
-    if (type === 'markdown' || type === 'text') {
-        if (element.originalContent == undefined || element.originalContent !== content) { 
-            element.originalContent = content;
-            const parsedContentWrapper = document.createElement('div');
-            parsedContentWrapper.innerHTML = window.marked.parse(content || '');
-            parsedContentWrapper.classList.add('parsed-content-wrapper');
-            element.innerHTML = '';
-            element.appendChild(parsedContentWrapper);
-        }
-        if (node.mdFrontmatter?.direction === 'rtl' && !element.classList.contains('rtl')) element.classList.add('rtl');
-    }
-}
-
-function createOverlayElement(type, node) {
-    let element;
-    if (type === 'text' || type === 'markdown') {
-        element = document.createElement('div');
-        element.className = 'markdown-content';
-    } else if (type === 'link') {
-        element = document.createElement('div');
-        element.className = 'link-overlay-container';
-        const iframe = document.createElement('iframe');
-        iframe.src = node.url;
-        iframe.sandbox = 'allow-scripts allow-same-origin';
-        iframe.className = 'link-iframe';
-        iframe.loading = 'lazy';
-        const clickLayer = document.createElement('div');
-        clickLayer.className = 'link-click-layer';
-        element.appendChild(iframe);
-        element.appendChild(clickLayer);
-        element._iframe = iframe;
-        element._clickLayer = clickLayer;
-    }
-    element.id = node.id;
-    const colourClass = node.color == undefined ? 'color-0' : 'color-' + node.color;  
-    element.classList.add(colourClass);
-    if (overlayState.selectedOverlayId === node.id) element.classList.add('active');
-    return element;
 }
 
 function drawEdge(edge) {
@@ -579,19 +401,20 @@ function drawArrowhead(tipX, tipY, fromX, fromY) {
 
 // === Minimap ===
 function drawMinimap() {
-    minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
-    minimapCtx.fillStyle = '#333';
-    minimapCtx.fillRect(0, 0, minimap.width, minimap.height);
-    minimapCtx.save();    
     const bounds = calculateNodesBounds();
     if (!bounds) return;
     const contentWidth = bounds.maxX - bounds.minX;
     const contentHeight = bounds.maxY - bounds.minY;
-    const scaleX = minimap.width / contentWidth;
-    const scaleY = minimap.height / contentHeight;
-    const minimapScale = Math.min(scaleX, scaleY) * 0.9;     
-    const centerX = minimap.width / 2;
-    const centerY = minimap.height / 2;
+    const minimapRect = minimap.getBoundingClientRect();
+    const displayWidth = minimapRect.width;
+    const displayHeight = minimapRect.height;
+    const scaleX = displayWidth / contentWidth;
+    const scaleY = displayHeight / contentHeight;
+    const minimapScale = Math.min(scaleX, scaleY) * 0.9;
+    const centerX = (minimap.width / dpr) / 2;
+    const centerY = (minimap.height / dpr) / 2;
+    minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
+    minimapCtx.save();
     minimapCtx.translate(centerX, centerY);
     minimapCtx.scale(minimapScale, minimapScale);
     minimapCtx.translate(-(bounds.minX + contentWidth / 2), -(bounds.minY + contentHeight / 2));
@@ -643,21 +466,22 @@ function updateViewportRectangle() {
     const minimap = document.getElementById('minimap-canvas');
     const contentWidth = bounds.maxX - bounds.minX;
     const contentHeight = bounds.maxY - bounds.minY;
-    const scaleX = minimap.width / contentWidth;
-    const scaleY = minimap.height / contentHeight;
+    const minimapRect = minimap.getBoundingClientRect();
+    const minimapDisplayWidth = minimapRect.width;
+    const minimapDisplayHeight = minimapRect.height;
+    const scaleX = minimapDisplayWidth / contentWidth;
+    const scaleY = minimapDisplayHeight / contentHeight;
     const minimapScale = Math.min(scaleX, scaleY) * 0.9;
-    const centerX = minimap.width / 2;
-    const centerY = minimap.height / 2;
-    // Viewport in world coords
-    const viewWidth = canvas.width / scale;
-    const viewHeight = canvas.height / scale;
-    const viewportCenterX = -offsetX / scale + canvas.width / (2 * scale);
-    const viewportCenterY = -offsetY / scale + canvas.height / (2 * scale);
-    // Rectangle in minimap coords
+    const centerX = minimapDisplayWidth / 2;
+    const centerY = minimapDisplayHeight / 2;
+    const viewWidth = window.innerWidth / scale;
+    const viewHeight = window.innerHeight / scale;
+    const viewportCenterX = -offsetX / scale + window.innerWidth / (2 * scale);
+    const viewportCenterY = -offsetY / scale + window.innerHeight / (2 * scale);
     const viewRectX = centerX + (viewportCenterX - viewWidth/2 - (bounds.minX + contentWidth/2)) * minimapScale;
     const viewRectY = centerY + (viewportCenterY - viewHeight/2 - (bounds.minY + contentHeight/2)) * minimapScale;
     const viewRectWidth = viewWidth * minimapScale;
-    const viewRectHeight = viewHeight * minimapScale;
+    const viewRectHeight = viewHeight * minimapScale;    
     const viewportRect = document.getElementById('viewport-rectangle');
     viewportRect.style.left = viewRectX + 'px';
     viewportRect.style.top = viewRectY + 'px';
@@ -671,52 +495,200 @@ function setInitialView() {
     const PADDING = 50;
     const contentWidth = bounds.maxX - bounds.minX + (PADDING * 2);
     const contentHeight = bounds.maxY - bounds.minY + (PADDING * 2);
-    const scaleX = canvas.width / contentWidth;
-    const scaleY = canvas.height / contentHeight;
-    const newScale = Math.min(scaleX, scaleY);
+    // Use logical dimensions for scaling calculations
+    const viewWidth = window.innerWidth;
+    const viewHeight = window.innerHeight;
+    const scaleX = viewWidth / contentWidth;
+    const scaleY = viewHeight / contentHeight;
+    const newScale = Math.round(Math.min(scaleX, scaleY) * 1000) / 1000;
     const contentCenterX = bounds.minX + (bounds.maxX - bounds.minX) / 2;
     const contentCenterY = bounds.minY + (bounds.maxY - bounds.minY) / 2;
     const initialView = {
         scale: newScale,
-        offsetX: canvas.width/2 - contentCenterX * newScale,
-        offsetY: canvas.height/2 - contentCenterY * newScale
+        offsetX: viewWidth / 2 - contentCenterX * newScale,
+        offsetY: viewHeight / 2 - contentCenterY * newScale
     };
     scale = initialView.scale;
+    targetScale = scale; // Set targetScale to the initial scale
     offsetX = initialView.offsetX;
     offsetY = initialView.offsetY;
     zoomSlider.value = scaleToSlider(scale);
-    requestDraw();
+    perFrame.needAnimating = true;
+    requestAnimationFrame(draw);
+}
+// #endregion
+
+// #region Overlays
+function isNodeInViewport(node, margin = 200) {
+    const viewLeft = (-offsetX) / scale - margin;
+    const viewTop = (-offsetY) / scale - margin;
+    const viewRight = viewLeft + canvas.width / scale + 2 * margin;
+    const viewBottom = viewTop + canvas.height / scale + 2 * margin;
+    return (
+        node.x + node.width > viewLeft &&
+        node.x < viewRight &&
+        node.y + node.height > viewTop &&
+        node.y < viewBottom
+    );
 }
 
-// === Scale Computing ===
-function pointerAtWorld(e) {
-    const rect = canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
-    return {
-        x: (screenX - offsetX) / scale,
-        y: (screenY - offsetY) / scale
+
+async function loadMarkdownForNode(node) {
+    if (!markdownCache[node.file]) {
+        markdownCache[node.file] = { status: 'loading', content: null, frontmatter: null };
+        try {
+            let result = await fetch(canvasBaseDir + node.file);
+            result = await result.text();
+            const frontmatterMatch = result.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+            if (frontmatterMatch) {
+                const frontmatter = frontmatterMatch[1].split('\n').reduce((acc, line) => {
+                    const [key, value] = line.split(':').map(s => s.trim());
+                    acc[key] = value;
+                    return acc;
+                }, {});
+                markdownCache[node.file] = { status: 'loaded', content: frontmatterMatch[2].trim(), frontmatter };
+            } else markdownCache[node.file] = { status: 'loaded', content: result, frontmatter: null };
+        } catch(err) {
+            console.error('Failed to load markdown:', err);
+            markdownCache[node.file] = { status: 'error', content: 'Failed to load content', frontmatter: null };
+        }
+    }
+    if (markdownCache[node.file].status === 'loaded') {
+        node.mdContent = markdownCache[node.file].content;
+        node.mdFrontmatter = markdownCache[node.file].frontmatter;
+    } else if (markdownCache[node.file].status === 'error') {
+        node.mdContent = markdownCache[node.file].content;
+        node.mdFrontmatter = null;
+    } else {
+        node.mdContent = 'Loading...';
+        node.mdFrontmatter = null;
+    }
+    updateOrCreateOverlay(node, node.mdContent, 'markdown');
+}
+
+function updateAllOverlays() {
+    const neededOverlays = new Set();
+    const overlayCreators = {
+        text: (node) => {
+            if (node._inViewport) {
+                neededOverlays.add(node.id);
+                updateOrCreateOverlay(node, node.text, 'text');
+            }
+        },
+        file: (node) => {
+            if (node.file.match(/\.md$/i) && node.mdContent && node._inViewport) {
+                neededOverlays.add(node.id);
+                updateOrCreateOverlay(node, node.mdContent, 'markdown');
+            } else if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i) && node._inViewport) {
+                neededOverlays.add(node.id);
+                updateOrCreateOverlay(node, canvasBaseDir + node.file, 'image');
+            }
+        },
+        link: (node) => {
+            neededOverlays.add(node.id);
+            updateOrCreateOverlay(node, node.url, 'link')
+        }
     };
+    canvasData.nodes.forEach(node => {
+        if (overlayCreators[node.type]) overlayCreators[node.type](node);
+    });
+    Object.keys(overlays).forEach(id => {
+        if (!neededOverlays.has(id)) {
+            const div = overlays[id];
+            if (div && div.parentNode) div.parentNode.removeChild(div);
+            delete overlays[id];
+        }
+    });
 }
 
+function updateOrCreateOverlay(node, content, type) {
+    let element = overlays[node.id];
+    if (!element) {
+        element = new overLay(node, content, type);
+        overlaysLayer.appendChild(element);
+        overlays[node.id] = element;
+        element.style.left = node.x + 'px';
+        element.style.top = node.y + 'px';
+        element.style.width = node.width + 'px';
+        element.style.height = node.height + 'px';
+    }
+    if (type === 'markdown' || type === 'text') {
+        if (element.originalContent == undefined || element.originalContent !== content) { 
+            element.originalContent = content;
+            const parsedContentContainer = element.getElementsByClassName('parsed-content-wrapper')[0];
+            parsedContentContainer.innerHTML = window.marked.parse(content || '');
+        }
+        if (node.mdFrontmatter?.direction === 'rtl' && !element.classList.contains('rtl')) element.classList.add('rtl');
+    }
+}
+
+class overLay extends HTMLElement {
+    constructor(node, content, type) {
+        super();
+        this.classList.add('overlay-container');
+        const overlayBorder = document.createElement('div');
+        overlayBorder.className = 'overlay-border';
+        this.appendChild(overlayBorder);
+        if (type === 'text' || type === 'markdown') {
+            this.classList.add('markdown-content');
+            const parsedContentWrapper = document.createElement('div');
+            parsedContentWrapper.innerHTML = window.marked.parse(content || '');
+            parsedContentWrapper.classList.add('parsed-content-wrapper');
+            this.appendChild(parsedContentWrapper);
+        } else if (type === 'link') {
+            const iframe = document.createElement('iframe');
+            iframe.src = content;
+            iframe.sandbox = 'allow-scripts allow-same-origin';
+            iframe.className = 'link-iframe';
+            iframe.loading = 'lazy';
+            const clickLayer = document.createElement('div');
+            clickLayer.className = 'link-click-layer';
+            this.appendChild(iframe);
+            this.appendChild(clickLayer);
+        } else if (type === 'image') {
+            const img = document.createElement('img');
+            img.src = content;
+            img.loading = 'lazy';
+            this.appendChild(img);
+        }
+        this.id = node.id;
+        const colourClass = node.color == undefined ? 'color-0' : 'color-' + node.color;  
+        this.classList.add(colourClass);
+        if (overlayState.selectedOverlayId === node.id) this.classList.add('active');
+        const mouseenterHandler = () => {
+            if (overlayState.selectedOverlayId === node.id) overlayState.isHoveringSelectedOverlay = true;
+        }
+        const mouseleaveHandler = () => {
+            if (overlayState.selectedOverlayId === node.id) overlayState.isHoveringSelectedOverlay = false;
+        }
+        this.addEventListener('mouseenter', mouseenterHandler);
+        this.addEventListener('mouseleave', mouseleaveHandler);
+    }
+}
+customElements.define('over-lay', overLay);
+// #endregion
+
+// #region Scale and Preview
 function scaleToSlider(scale) { return Math.log(scale) / Math.log(1.1) }
 
 function updateScale(newScale) {
-    // Get the world coordinates at the center of the canvas before zoom
-    const centerScreenX = canvas.width / 2;
-    const centerScreenY = canvas.height / 2;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const centerScreenX = viewportWidth / 2;
+    const centerScreenY = viewportHeight / 2;
     const worldCenterX = (centerScreenX - offsetX) / scale;
     const worldCenterY = (centerScreenY - offsetY) / scale;
-    // Update scale
-    scale = Math.max(0.05, Math.min(20, newScale));
-    // Adjust offset so the same world point stays at the center
-    offsetX = centerScreenX - worldCenterX * scale;
-    offsetY = centerScreenY - worldCenterY * scale;
-    zoomSlider.value = scaleToSlider(scale);
-    requestDraw();
+    perFrame.zoomOrigin = {
+        x: worldCenterX,
+        y: worldCenterY,
+        screenX: centerScreenX,
+        screenY: centerScreenY,
+    }
+    targetScale = Math.round(Math.max(0.05, Math.min(20, newScale)) * 1000) / 1000;
+    perFrame.zoom = true;
 }
 
-// === Preview Modal ===
+// === Preview ===
 function showPreviewModal(content) {
     previewModalContent.innerHTML = '';
     isPreviewModalOpen = true;
@@ -730,18 +702,7 @@ function hidePreviewModal() {
     previewModalBackdrop.classList.add('hidden');
     previewModal.classList.add('hidden');
 }
-
-function getTouchDistance(touches) {
-    const dx = touches[0].clientX - touches[1].clientX;
-    const dy = touches[0].clientY - touches[1].clientY;
-    return Math.sqrt(dx * dx + dy * dy);
-}
-function getTouchMidpoint(touches) {
-    return {
-        x: (touches[0].clientX + touches[1].clientX) / 2,
-        y: (touches[0].clientY + touches[1].clientY) / 2
-    };
-}
+// #endregion
 
 // #region Mouse/Touch Event
 function onWindowMouseDown(eve, touch = false) {
@@ -781,9 +742,14 @@ function onWindowMouseDown(eve, touch = false) {
     }
 }
 
-const onWindowMouseMove = throttle((eve, touch = false) => {
-    if (isPreviewModalOpen) return;
-    if (!dragState.isDragging && !pinchZoomState.isPinching) return;
+function onWindowMouseMove(eve, touch = false) {
+    if (isPreviewModalOpen || (!dragState.isDragging && !pinchZoomState.isPinching)) return;
+    perFrame.mouseMove = true;
+    perFrame.moveParams.e = eve;
+    perFrame.moveParams.touch = touch;
+}
+
+function mouseMove(eve, touch) {
     if (dragState.isDragging) {
         const e = touch ? eve.touches[0] : eve;
         const dx = e.clientX - dragState.lastClientX;
@@ -796,7 +762,7 @@ const onWindowMouseMove = throttle((eve, touch = false) => {
     } else if (pinchZoomState.isPinching && touch) {
         const newDistance = getTouchDistance(eve.touches);
         let zoomFactor = newDistance / pinchZoomState.initialDistance;
-        let newScale = Math.max(0.05, Math.min(20, pinchZoomState.initialScale * zoomFactor));
+        let newScale = Math.round(Math.max(0.05, Math.min(20, pinchZoomState.initialScale * zoomFactor)) * 1000) / 1000;
         // Calculate world coordinates at midpoint before zoom
         const rect = canvas.getBoundingClientRect();
         const midpoint = getTouchMidpoint(eve.touches);
@@ -808,12 +774,10 @@ const onWindowMouseMove = throttle((eve, touch = false) => {
         scale = newScale;
         offsetX = screenX - worldX * scale - pinchZoomState.lastMidpointX + midpoint.x;
         offsetY = screenY - worldY * scale - pinchZoomState.lastMidpointY + midpoint.y;
-        zoomSlider.value = scaleToSlider(scale);
         pinchZoomState.lastMidpointX = midpoint.x;
         pinchZoomState.lastMidpointY = midpoint.y;
     }
-    requestDraw();
-}, 16)
+}
 
 function onWindowMouseUp(eve, touch = false, lag = false) {
     if (isPreviewModalOpen) return;
@@ -853,24 +817,10 @@ function onWindowMouseUp(eve, touch = false, lag = false) {
 function select(id) {
     const previous = overlayState.selectedOverlayId === null ? null : document.getElementById(overlayState.selectedOverlayId);
     const current = id === null ? null : document.getElementById(id);
-    if (previous) {
-        previous.classList.remove('active');
-        if (previous._hasHoverListeners) {
-            previous.removeEventListener('mouseenter', previous._mouseenterHandler);
-            previous.removeEventListener('mouseleave', previous._mouseleaveHandler);
-            previous._hasHoverListeners = false;
-        }
-    }
+    if (previous) previous.classList.remove('active');
     if (current) {
         current.classList.add('active');
         overlayState.isHoveringSelectedOverlay = true;
-        if (!current._hasHoverListeners) {
-            current._mouseenterHandler = () => overlayState.isHoveringSelectedOverlay = true;
-            current._mouseleaveHandler = () => overlayState.isHoveringSelectedOverlay = false;
-            current.addEventListener('mouseenter', current._mouseenterHandler);
-            current.addEventListener('mouseleave', current._mouseleaveHandler);
-            current._hasHoverListeners = true;
-        }
     } else overlayState.isHoveringSelectedOverlay = false;
     overlayState.selectedOverlayId = id;
 }
@@ -885,55 +835,121 @@ function onTouch(e, state) {
         else onWindowMouseUp(dragState.lastTouchPoint, true, true);
     }
 }
-// #endregion
 
-// #region Wheel Event
-const normalWheel = throttle((e) => {
-    if (isPreviewModalOpen) return;
-    if (Math.abs(e.deltaX) > 0 && !e.ctrlKey && !touchPadMode) touchPadMode = true;
-    if (overlayState.isHoveringSelectedOverlay && (!touchPadMode || (touchPadMode && Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.ctrlKey))) return;
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const worldX = (mouseX - offsetX) / scale;
-    const worldY = (mouseY - offsetY) / scale;
-    // Zoom if ctrlKey or vertical wheel
-    if (!touchPadMode || e.ctrlKey) {
-        let zoomFactor = 1.06;
-        let newScale = scale;
-        if (e.deltaY < 0) newScale *= zoomFactor;
-        else newScale /= zoomFactor;
-        newScale = Math.max(0.05, Math.min(20, newScale));
-        offsetX = mouseX - worldX * newScale;
-        offsetY = mouseY - worldY * newScale;
-        scale = newScale;
-        zoomSlider.value = scaleToSlider(scale);
-    } else {
-        offsetX -= e.deltaX;
-        offsetY -= e.deltaY;
-    }
-    requestDraw();
-}, 16)
-
-function onWheel(e) {
-    if (isPreviewModalOpen) return;
-    if (e.ctrlKey && !touchPadMode) touchPadMode = true;
-    if (e.ctrlKey || (touchPadMode && Math.abs(e.deltaY) < Math.abs(e.deltaX))) e.preventDefault();
-    normalWheel(e);
+function getTouchDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
 }
 
-window.addEventListener('wheel', onWheel, { passive: false });
+function getTouchMidpoint(touches) {
+    return {
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2
+    };
+}
+
+// === Wheel ===
+function wheelPan(e) {
+    perFrame.wheelPan = false;
+    offsetX -= e.deltaX;
+    offsetY -= e.deltaY;
+}
+
+function smoothZoom() {
+    if (targetScale !== scale) {
+        const scaleDiff = targetScale - scale;
+        if (Math.abs(scaleDiff) < targetScale * 0.01) {
+            scale = targetScale;
+            perFrame.zoom = false;
+        } else {
+            const newScale = scale + scaleDiff * ZOOM_SMOOTHNESS;
+            scale = Math.round(newScale * 1000) / 1000;
+        }
+        offsetX = perFrame.zoomOrigin.screenX - perFrame.zoomOrigin.x * scale;
+        offsetY = perFrame.zoomOrigin.screenY - perFrame.zoomOrigin.y * scale;
+        zoomSlider.value = scaleToSlider(scale);
+    }
+}
+
+function onWheel(e) {
+    if (!touchPadMode && (e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY))) touchPadMode = true;
+    if (isPreviewModalOpen ||
+        overlayState.isHoveringSelectedOverlay && 
+            (!touchPadMode || Math.abs(e.deltaY) > Math.abs(e.deltaX) && !e.ctrlKey)
+    ) return;
+    e.preventDefault();
+    if (touchPadMode && !e.ctrlKey) {
+        perFrame.wheelPan = true;
+        perFrame.wheelPanEvent = e;
+    } else {
+        if (e.deltaY < 0) targetScale *= ZOOM_FACTOR;
+        else targetScale /= ZOOM_FACTOR;
+        targetScale = Math.round(Math.max(0.05, Math.min(20, targetScale)) * 1000) / 1000;
+        perFrame.zoomOrigin = pointerAtWorld(e);
+        perFrame.zoom = true;
+    }
+}
 // #endregion
 
 // #region Init
+async function initCanvas() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const canvasPath = urlParams.get('path') ? decodeURIComponent(urlParams.get('path')) : 'example/introduction.canvas';
+        // Determine base directory for related files
+        if (/^https?:\/\//.test(canvasPath)) canvasBaseDir = canvasPath.substring(0, canvasPath.lastIndexOf('/') + 1);
+        else {
+            // Local or relative path
+            const lastSlash = canvasPath.lastIndexOf('/');
+            canvasBaseDir = lastSlash !== -1 ? canvasPath.substring(0, lastSlash + 1) : './';
+        }
+        canvasData = await fetch(canvasPath).then(res => res.json());
+        canvasData.nodes.forEach(node => { nodeMap[node.id] = node; });
+        buildSpatialGrid();
+        // Main canvas fills window
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        resizeCanvasForDPR(canvas, ctx, width, height);
+        // Minimap fills its container
+        const minimapContainer = document.getElementById('minimap');
+        const rect = minimapContainer.getBoundingClientRect();
+        resizeCanvasForDPR(minimap, minimapCtx, rect.width, rect.height);
+        setInitialView();
+        drawMinimap();
+    } catch (err) { console.error('Failed to load canvas data:', err) }
+}
+
+function buildSpatialGrid() {
+    if (!canvasData || canvasData.nodes.length < 50) {
+        spatialGrid = null;
+        return;
+    }
+    spatialGrid = {};
+    for (let node of canvasData.nodes) {
+        const minCol = Math.floor(node.x / GRID_CELL_SIZE);
+        const maxCol = Math.floor((node.x + node.width) / GRID_CELL_SIZE);
+        const minRow = Math.floor(node.y / GRID_CELL_SIZE);
+        const maxRow = Math.floor((node.y + node.height) / GRID_CELL_SIZE);
+        for (let col = minCol; col <= maxCol; col++) {
+            for (let row = minRow; row <= maxRow; row++) {
+                const key = `${col},${row}`;
+                if (!spatialGrid[key]) spatialGrid[key] = [];
+                spatialGrid[key].push(node);
+            }
+        }
+    }
+}
+
+// === Controls ===
 window.addEventListener('mousedown', onWindowMouseDown);
 window.addEventListener('mousemove', onWindowMouseMove);
 window.addEventListener('mouseup', onWindowMouseUp);
+window.addEventListener('wheel', onWheel, { passive: false });
 window.addEventListener('touchstart', (e) => onTouch(e, 'start'), { passive: false });
 window.addEventListener('touchmove', (e) => onTouch(e, 'move'), { passive: false });
 window.addEventListener('touchend', (e) => onTouch(e, 'end'), { passive: false });
 window.addEventListener('resize', onWindowResize);
-initCanvas();
 const zoomSlider = document.getElementById('zoom-slider');
 const toggleMinimapBtn = document.getElementById('toggle-minimap');
 document.getElementById('zoom-in').addEventListener('click', () => updateScale(scale * 1.2));
@@ -974,4 +990,6 @@ const previewModalContent = document.getElementById('preview-modal-content');
 
 previewModalClose.addEventListener('click', hidePreviewModal);
 previewModalBackdrop.addEventListener('click', hidePreviewModal);
+
+initCanvas();
 // #endregion
