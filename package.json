@@ -1,0 +1,51 @@
+{
+	"name": "obsidian-canvas-viewer",
+	"version": "2.0.0",
+	"description": "A JavaScript-based viewer for Obsidian Canvas, easy to embed into websites.",
+	"main": "dist/canvasViewer.js",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/hesprs/Obsidian-Canvas-Viewer.git"
+	},
+	"homepage": "https://github.com/hesprs/Obsidian-Canvas-Viewer#readme",
+	"bugs": {
+		"url": "https://github.com/hesprs/Obsidian-Canvas-Viewer/issues"
+	},
+	"keywords": [
+		"Obsidian",
+		"JSON Canvas",
+		"Viewer",
+		"Front-end",
+		"HTML Canvas"
+	],
+	"author": {
+		"name": "Hēsperus",
+		"email": "hesprs@outlook.com"
+	},
+	"license": "MIT",
+	"packageManager": "pnpm@10.13.1",
+	"devDependencies": {
+		"@eslint/css": "^0.10.0",
+		"@eslint/js": "^9.32.0",
+		"@eslint/json": "^0.13.1",
+		"@eslint/markdown": "^7.1.0",
+		"cross-env": "^10.0.0",
+		"eslint": "^9.32.0",
+		"eslint-config-prettier": "^10.1.8",
+		"globals": "^16.3.0",
+		"vite": "^7.0.6",
+		"vite-plugin-css-injected-by-js": "^3.5.2"
+	},
+	"files": [
+		"dist/canvasViewer.js"
+	],
+	"scripts": {
+		"dev": "vite",
+		"build:external": "vite build",
+		"build:integrated": "cross-env VITE_BUILD_INTEGRATED=true vite build",
+		"build": "pnpm run build:external && pnpm run build:integrated"
+	},
+	"peerDependencies": {
+		"marked": "^16.1.1"
+	}
+}
