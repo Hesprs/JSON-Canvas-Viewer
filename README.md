@@ -4,7 +4,7 @@
 
 ![Canvas Viewer](example/preview.png)
 
-A **web-based** viewer for **Obsidian Canvas** files, now as a reusable JavaScript class. View and interact with your canvas files directly in the browser, or embed the viewer in your own front-end projects with ease.
+A **JavaScript-based** viewer for **Obsidian Canvas** files. View and interact with your canvas files directly in the browser, or embed the viewer in your own front-end projects with ease.
 
 This project is inspired by [sofanati-nour/obsidian-canvas-web-renderer](https://github.com/sofanati-nour/obsidian-canvas-web-renderer), but is far more developed and optimized.
 

@@ -28,7 +28,7 @@ jobs:
         run: pnpm install
 
       - name: Build
-        run: pnpm build
+        run: pnpm build:external
 
       - name: Publish to npm
         run: pnpm publish --access public
