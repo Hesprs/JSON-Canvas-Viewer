@@ -1,41 +1,41 @@
 /*
-CanvasViewer.js
-A web-based viewer for Obsidian Canvas
+canvasViewer.js
+A web-based viewer for JSON Canvas
 Author: Hesprs (Hēsperus)
-Version: 2.0.0
 Todo:
 - [ ] enable zooming by pinch when hovering seclected overlay
 - [ ] add a way to lazy load the canvas
 */
 
 import { marked } from 'marked';
-import styles from './styles.css?inline';
+import styles from './styles.scss?inline';
 
-export class CanvasViewer {
+export default class canvasViewer {
 	/**
 	 * @param {HTMLElement} container
 	 * @param {Array} [extensions = []]
 	 * @param {Array} [options = []]
 	 */
 	constructor(container, extensions = [], options = []) {
+		this.shadowContainer = container.attachShadow({ mode: 'open' });
 		// === Style ===
-		const style = document.createElement('style');
-		style.textContent = styles;
-		container.appendChild(style);
+		this.style = document.createElement('style');
+		this.style.innerHTML = styles;
+		this.shadowContainer.appendChild(this.style);
 
 		// === Real Container ===
-		this.realContainer = document.createElement('div');
-		this.realContainer.classList.add('container');
+		this.container = document.createElement('div');
+		this.container.classList.add('container');
 
 		// === Main Canvas ===
 		this.canvas = document.createElement('canvas');
 		this.canvas.className = 'main-canvas';
-		this.realContainer.appendChild(this.canvas);
+		this.container.appendChild(this.canvas);
 
 		// === Overlays Layer ===
 		this.overlaysLayer = document.createElement('div');
 		this.overlaysLayer.className = 'overlays';
-		this.realContainer.appendChild(this.overlaysLayer);
+		this.container.appendChild(this.overlaysLayer);
 
 		// Extension: Minimap
 		if (extensions.includes('minimap')) {
@@ -58,7 +58,7 @@ export class CanvasViewer {
 			this.viewportRectangle.className = 'viewport-rectangle';
 			this.minimap.appendChild(this.viewportRectangle);
 			this.minimapContainer.appendChild(this.minimap);
-			this.realContainer.appendChild(this.minimapContainer);
+			this.container.appendChild(this.minimapContainer);
 
 			this.isMinimapVisible = !options.includes('minimapCollapsed') ? true : false;
 			this.minimapContainer.classList.toggle('collapsed', !this.isMinimapVisible);
@@ -90,9 +90,8 @@ export class CanvasViewer {
 			this.controlsContent.className = 'controls-content';
 
 			this.toggleFullscreenBtn = document.createElement('button');
-			this.toggleFullscreenBtn.innerHTML = `
-				<svg viewBox="-5.28 -5.28 34.56 34.56" fill="none"><path d="M4 9V5.6c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 4 5.04 4 5.6 4H9M4 15v3.4c0 .56 0 .84.109 1.054a1 1 0 0 0 .437.437C4.76 20 5.04 20 5.6 20H9m6-16h3.4c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C20 4.76 20 5.04 20 5.6V9m0 6v3.4c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437C19.24 20 18.96 20 18.4 20H15" stroke-width="2.4" stroke-linecap="round"/></svg>
-			`;
+			this.toggleFullscreenBtn.innerHTML = `<svg viewBox="-5.28 -5.28 34.56 34.56" fill="none"><path d="M4 9V5.6c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 4 5.04 4 5.6 4H9M4 15v3.4c0 .56 0 .84.109 1.054a1 1 0 0 0 .437.437C4.76 20 5.04 20 5.6 20H9m6-16h3.4c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C20 4.76 20 5.04 20 5.6V9m0 6v3.4c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437C19.24 20 18.96 20 18.4 20H15" stroke-width="2.4" stroke-linecap="round"/></svg>`;
+
 			this.controlsContent.appendChild(this.toggleFullscreenBtn);
 
 			this.zoomOutBtn = document.createElement('button');
@@ -116,7 +115,7 @@ export class CanvasViewer {
 			this.controlsContent.appendChild(this.resetViewBtn);
 
 			this.controlsPanel.appendChild(this.controlsContent);
-			this.realContainer.appendChild(this.controlsPanel);
+			this.container.appendChild(this.controlsPanel);
 
 			this.toggleCollapseBtn.addEventListener('click', () => this.controlsPanel.classList.toggle('collapsed'));
 			this.controlsPanel.classList.toggle('collapsed', options.includes('controlsCollapsed'));
@@ -130,7 +129,7 @@ export class CanvasViewer {
 		// === Preview Modal ===
 		this.previewModalBackdrop = document.createElement('div');
 		this.previewModalBackdrop.className = 'preview-modal-backdrop hidden';
-		this.realContainer.appendChild(this.previewModalBackdrop);
+		this.container.appendChild(this.previewModalBackdrop);
 
 		this.previewModal = document.createElement('div');
 		this.previewModal.className = 'preview-modal hidden';
@@ -144,18 +143,18 @@ export class CanvasViewer {
 		this.previewModalContent.className = 'preview-modal-content';
 		this.previewModal.appendChild(this.previewModalContent);
 
-		this.realContainer.appendChild(this.previewModal);
-		container.appendChild(this.realContainer);
+		this.container.appendChild(this.previewModal);
+		this.shadowContainer.appendChild(this.container);
 
 		if (extensions.includes('mistouchPrevention')) {
 			this.preventionContainer = document.createElement('div');
 			this.preventionContainer.className = 'prevention-container';
 			this.preventionBanner = document.createElement('div');
 			this.preventionBanner.className = 'prevention-banner';
-			this.preventionBanner.innerHTML = 'Locked to prevent mistouch, click on to unlock.';
+			this.preventionBanner.innerHTML = 'Frozen to prevent mistouch, click on to unlock.';
 			this.preventionContainer.appendChild(this.preventionBanner);
-			this.realContainer.appendChild(this.preventionContainer);
-			this.realContainer.classList.add('numb');
+			this.container.appendChild(this.preventionContainer);
+			this.container.classList.add('numb');
 			this.preventMt = true;
 			this.preventMistouch = {
 				record: false,
@@ -166,18 +165,18 @@ export class CanvasViewer {
 			};
 		}
 
-		this.container = this.realContainer;
 		this.extensions = extensions;
 		this.options = options;
 
 		// === Variables ===
 		this.ctx = this.canvas.getContext('2d');
 		this.canvasBaseDir = null;
+		this.animationId = null;
 		this.offsetX = 0;
 		this.offsetY = 0;
 		this.scale = 1.0;
 		this.targetScale = 1.0; // Target scale for smooth zooming
-		this.touchPadMode = false;
+		this.touchPadMode = this.options.includes('proControlSchema') ? true : false;
 		this.isPreviewModalOpen = false;
 
 		// === Cache ===
@@ -398,7 +397,7 @@ export class CanvasViewer {
 	// #region Draw Functions
 	draw() {
 		if (!this.perFrame.needAnimating && !this.perFrame.wheelPan && !this.perFrame.resize && !this.perFrame.pointerMove && !this.perFrame.zoom) {
-			requestAnimationFrame(this.draw.bind(this));
+			this.animationId = requestAnimationFrame(this.draw.bind(this));
 			return;
 		}
 		if (this.perFrame.zoom) this.smoothZoom();
@@ -416,7 +415,7 @@ export class CanvasViewer {
 		this.redraw(currentViewport);
 		this.updateAllOverlays();
 		if (this.extensions.includes('minimap')) this.updateViewportRectangle(); // Extension: Minimap
-		requestAnimationFrame(this.draw.bind(this));
+		this.animationId = requestAnimationFrame(this.draw.bind(this));
 	}
 
 	resizeCanvasForDPR(canvas, ctx, width, height) {
@@ -788,7 +787,7 @@ export class CanvasViewer {
 			this.nodeBounds = this.calculateNodesBounds();
 			this.setInitialView();
 			this.resizeCanvasForDPR(this.canvas, this.ctx, this.container.offsetWidth, this.container.offsetHeight);
-			this.draw();
+			if (!this.preventMt) requestAnimationFrame(this.draw.bind(this));
 			// Extension: Minimap
 			if (this.extensions.includes('minimap')) {
 				this.resizeCanvasForDPR(this.minimapCanvas, this.minimapCtx, this.minimapCanvas.width, this.minimapCanvas.height);
@@ -902,11 +901,12 @@ export class CanvasViewer {
 	 * Destroy the viewer and clean up DOM and event listeners.
 	 */
 	destroy() {
+		cancelAnimationFrame(this.animationId);
 		if (this._resizeObserver) {
 			this._resizeObserver.disconnect();
 			this._resizeObserver = null;
 		}
-		this.container.innerHTML = '';
+		this.shadowContainer.innerHTML = '';
 		this._eventMap = {};
 	}
 	// #endregion
@@ -1082,14 +1082,10 @@ export class CanvasViewer {
 	toggleFullscreen(option = 'toggle') {
 		if (document.fullscreenElement === null && (option === 'toggle' || option === 'enter')) {
 			this.container.requestFullscreen();
-			this.toggleFullscreenBtn.innerHTML = `
-            	<svg viewBox="-40.32 -40.32 176.64 176.64"><path d="M30 60H6a6 6 0 0 0 0 12h18v18a6 6 0 0 0 12 0V66a5.997 5.997 0 0 0-6-6Zm60 0H66a5.997 5.997 0 0 0-6 6v24a6 6 0 0 0 12 0V72h18a6 6 0 0 0 0-12ZM66 36h24a6 6 0 0 0 0-12H72V6a6 6 0 0 0-12 0v24a5.997 5.997 0 0 0 6 6ZM30 0a5.997 5.997 0 0 0-6 6v18H6a6 6 0 0 0 0 12h24a5.997 5.997 0 0 0 6-6V6a5.997 5.997 0 0 0-6-6Z"/></svg>
-        	`;
+			this.toggleFullscreenBtn.innerHTML = `<svg viewBox="-40.32 -40.32 176.64 176.64"><path d="M30 60H6a6 6 0 0 0 0 12h18v18a6 6 0 0 0 12 0V66a5.997 5.997 0 0 0-6-6Zm60 0H66a5.997 5.997 0 0 0-6 6v24a6 6 0 0 0 12 0V72h18a6 6 0 0 0 0-12ZM66 36h24a6 6 0 0 0 0-12H72V6a6 6 0 0 0-12 0v24a5.997 5.997 0 0 0 6 6ZM30 0a5.997 5.997 0 0 0-6 6v18H6a6 6 0 0 0 0 12h24a5.997 5.997 0 0 0 6-6V6a5.997 5.997 0 0 0-6-6Z"/></svg>`;
 		} else if (document.fullscreenElement !== null && (option === 'toggle' || option === 'exit')) {
 			document.exitFullscreen();
-			this.toggleFullscreenBtn.innerHTML = `
-            	<svg viewBox="-5.28 -5.28 34.56 34.56" fill="none"><path d="M4 9V5.6c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 4 5.04 4 5.6 4H9M4 15v3.4c0 .56 0 .84.109 1.054a1 1 0 0 0 .437.437C4.76 20 5.04 20 5.6 20H9m6-16h3.4c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C20 4.76 20 5.04 20 5.6V9m0 6v3.4c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437C19.24 20 18.96 20 18.4 20H15" stroke-width="2.4" stroke-linecap="round"/></svg>
-        	`;
+			this.toggleFullscreenBtn.innerHTML = `<svg viewBox="-5.28 -5.28 34.56 34.56" fill="none"><path d="M4 9V5.6c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 4 5.04 4 5.6 4H9M4 15v3.4c0 .56 0 .84.109 1.054a1 1 0 0 0 .437.437C4.76 20 5.04 20 5.6 20H9m6-16h3.4c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C20 4.76 20 5.04 20 5.6V9m0 6v3.4c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437C19.24 20 18.96 20 18.4 20H15" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 		}
 	}
 	// #endregion
@@ -1340,6 +1336,7 @@ export class CanvasViewer {
 				this.preventionContainer.classList.remove('hidden');
 				this.container.classList.add('numb');
 				this.preventMt = true;
+				cancelAnimationFrame(this.animationId);
 			}
 		} else {
 			if (this.preventMt) {
@@ -1364,6 +1361,7 @@ export class CanvasViewer {
 			this.preventMistouch.record = false;
 			if (Math.abs(this.preventMistouch.lastClientX - this.preventMistouch.lastX) + Math.abs(this.preventMistouch.lastClientY - this.preventMistouch.lastY) < 5) {
 				this.preventMt = false;
+				this.animationId = requestAnimationFrame(this.draw.bind(this));
 				this.preventionContainer.classList.add('hidden');
 				setTimeout(() => this.container.classList.remove('numb'), 50); // minimum delay to prevent triggering undesired button touch
 			}
@@ -1377,10 +1375,9 @@ class obsidianCanvas extends HTMLElement {
 		super();
 		this.style.display = 'block';
 		this.style.overflow = 'hidden';
-		this.attachShadow({ mode: 'open' });
 		const extensions = this.getAttribute('extensions') ? this.getAttribute('extensions').split(' ') : [];
 		const options = this.getAttribute('options') ? this.getAttribute('options').split(' ') : [];
-		this.viewer = new CanvasViewer(this.shadowRoot, extensions, options);
+		this.viewer = new canvasViewer(this, extensions, options);
 	}
 	connectedCallback() {
 		if (this.viewer) this.viewer.loadCanvas(this.getAttribute('src'));

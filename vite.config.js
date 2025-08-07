@@ -1,8 +1,5 @@
-/* eslint-disable no-unused-vars */
-/* eslint-disable no-undef */
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import cssInjectedByJsPlugin from 'vite-plugin-css-injected-by-js';
 const isIntegratedBuild = process.env.VITE_BUILD_INTEGRATED === 'true';
 
 export default defineConfig({
@@ -16,26 +13,23 @@ export default defineConfig({
 		outDir: resolve(__dirname, 'dist'),
 		emptyOutDir: !isIntegratedBuild,
 		minify: 'esbuild',
-    cssCodeSplit: false,
+		cssCodeSplit: false,
 		lib: {
 			entry: resolve(__dirname, 'src/canvasViewer.js'),
-			name: 'CanvasViewer',
+			name: 'canvasViewer',
 		},
 		rollupOptions: {
-      external: isIntegratedBuild ? [] : ['marked'],
-      output: {
-        entryFileNames: (chunkInfo) => {
-          if (isIntegratedBuild) {
-            return `canvasViewer.inte.js`;
-          }
-          return `canvasViewer.js`;
-        },
-      },
-    },
+			external: isIntegratedBuild ? [] : ['marked'],
+			output: {
+				entryFileNames: () => {
+					if (isIntegratedBuild) return `canvasViewer.inte.js`;
+					else return `canvasViewer.js`;
+				},
+			},
+		},
 	},
-	plugins: [cssInjectedByJsPlugin()],
 	server: {
 		open: '/',
 	},
-  publicDir: resolve(__dirname, 'dist'),
+	publicDir: resolve(__dirname, 'dist'),
 });

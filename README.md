@@ -1,35 +1,46 @@
 # Obsidian Canvas Viewer
 
-![Version](https://badgen.net/static/version/2.0.0?color=cyan)
+[![npm](https://badgen.net/npm/v/obsidian-canvas-viewer)](https://www.npmjs.com/package/obsidian-canvas-viewer)
+[![install size](https://badgen.net/packagephobia/install/obsidian-canvas-viewer)](https://packagephobia.now.sh/result?p=obsidian-canvas-viewer)
+[![github commits](https://badgen.net/github/commits/hesprs/Obsidian-Canvas-Viewer?color=purple)](https://github.com/hesprs/Obsidian-Canvas-Viewer/commits/main)
 
 ![Canvas Viewer](example/preview.png)
 
-A **JavaScript-based** viewer for **Obsidian Canvas** files. View and interact with your canvas files directly in the browser, or embed the viewer in your own front-end projects with ease.
+A **JavaScript-based** viewer for **Obsidian Canvas** files. View and interact with your canvas files directly in the browser, or embed the viewer in your own front-end projects with ease. It is built without any web framework so it can be easily integrated into any framework.
 
 This project is inspired by [sofanati-nour/obsidian-canvas-web-renderer](https://github.com/sofanati-nour/obsidian-canvas-web-renderer), but is far more developed and optimized.
 
+For more about **Obsidian Canvas**, also known as **JSON Canvas**, please visit [jsoncanvas.org](https://jsoncanvas.org/).
+
 ## 📦 Installation
 
-We recommend using `npm`, `pnpm` or any other favorable package managers to install the package. **Note: This package requires `marked.js` as dependency, your package manager will remind you to install it.**
+We recommend using `npm`, `pnpm` or any other favorable package managers to install the package. **Note: This package requires `marked` as dependency, your package manager will remind you to install it.**
 
 ```bash
+# npm
 npm install obsidian-canvas-viewer
+
+# pnpm
+pnpm add obsidian-canvas-viewer
+
+# yarn
+yarn add obsidian-canvas-viewer
 ```
 
-If your project *doesn't use Node.js*, you can use the integrated version, which is built with `marked` and `canvas-viewer.js` inlined, so it can be deployed in vanilla JavaScript projects. Find the integrated version in [Release page](https://github.com/hesprs/Obsidian-Canvas-Viewer/releases).
+If your project *doesn't use Node.js*, you can use the integrated version, which is built with `marked` and `obsidian-canvas-viewer` inlined, so it can be deployed in vanilla JavaScript projects. Find the integrated version in [Release page](https://github.com/hesprs/Obsidian-Canvas-Viewer/releases).
 
 After installation, you can import the package as a module:
 
 If you use Node.js, you can use the following import:
 
 ```js
-import { CanvasViewer } from 'obsidian-canvas-viewer';
+import canvasViewer from 'obsidian-canvas-viewer';
 ```
 
 Or you use the integrated version, import it as below:
 
 ```js
-import { CanvasViewer } from 'path/to/canvasViewer.inte.js';
+import canvasViewer from 'path/to/canvasViewer.inte.js';
 ```
 
 ## 🚀 Quick Start
@@ -49,7 +60,7 @@ Or instantiate the viewer (more flexible, but requires more code):
 ```html
 <div id="myCanvasContainer" style="width:800px; height:600px;"></div>
 <script>
-    const viewer = new CanvasViewer(
+    const viewer = new canvasViewer(
         document.getElementById('myCanvasContainer'), 
         ['minimap', 'mistouchPrevention'],
         ['minimapCollapsed']
@@ -83,17 +94,18 @@ Or instantiate the viewer (more flexible, but requires more code):
 ### Constructor
 
 ```js
-new CanvasViewer(container, extensions, options);
+new canvasViewer(container, extensions, options);
 ```
 
 - `container`: HTMLElement where the viewer will be rendered
 - `extensions`: (optional) Array (or space-separated string in case of custom element) of extension names to enable:
-  - `minimap` - Adds navigation minimap
-  - `mistouchPrevention` - Locks canvas when clicking outside
+    - `minimap` - Adds navigation minimap
+    - `mistouchPrevention` - Frozes canvas when clicking outside. **Warning: external navigation (like `zoomIn()` or `resetView()`) cannot take effect if the canvas is frozen**.
 - `options`: (optional) Array (or space-separated string in case of custom element) of config options:
-  - `minimapCollapsed` - Starts with minimap collapsed
-  - `controlsHidden` - Hides the control panel
-  - `controlsCollapsed` - Starts with controls collapsed
+    - `minimapCollapsed` - Starts with minimap collapsed
+    - `controlsHidden` - Hides the control panel
+    - `controlsCollapsed` - Starts with controls collapsed
+    - `proControlSchema` - Uses control keybindings in professional softwares (mouse wheel: scroll vertically; mouse wheel + shift: scroll horizontally; mouse wheel + ctrl: zoom), rather than mouse wheel to zoom. The canvas viewer automatically detect and adjust control schema by default, but you can explicitly configure it. This option doesn't affect mobile control.
 
 ### Methods
 
@@ -118,8 +130,6 @@ Register with `viewer.on(event, callback)`.
 - `zoom` — Fired when zoom level changes (`callback(scale)`)
 - `pan` — Fired when the view is panned (`callback({x, y})`)
 - `resetView` — Fired when the view is reset (`callback()`)
-
----
 
 ## 📂 Canvas File Structure
 
@@ -160,8 +170,8 @@ The viewer expects Obsidian Canvas files in JSON format:
 - Key files:
     - `src/canvasViewer.js`: Main class-based component
     - `example/index.html`: Example/demo entry point
-    - `src/styles.css` or `src/styles.scss`: Styles for the viewer
+    - `src/styles.scss`: Styles for the viewer
 
-## 📝 License
+## 📝 Copyright & License
 
-Copyright ©️ 2025 Hesprs (Hēsperus) | MIT License
+Copyright ©️ 2025 Hesprs (Hēsperus) | [MIT License](https://mit-license.org/)

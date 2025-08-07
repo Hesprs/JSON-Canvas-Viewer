@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-canvas-viewer",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"description": "A JavaScript-based viewer for Obsidian Canvas, easy to embed into websites.",
 	"main": "dist/canvasViewer.js",
 	"repository": {
@@ -33,8 +33,8 @@
 		"eslint": "^9.32.0",
 		"eslint-config-prettier": "^10.1.8",
 		"globals": "^16.3.0",
-		"vite": "^7.0.6",
-		"vite-plugin-css-injected-by-js": "^3.5.2"
+		"sass": "^1.90.0",
+		"vite": "^7.0.6"
 	},
 	"files": [
 		"dist/canvasViewer.js"
@@ -45,7 +45,7 @@
 		"build:integrated": "cross-env VITE_BUILD_INTEGRATED=true vite build",
 		"build": "pnpm run build:external && pnpm run build:integrated"
 	},
-	"peerDependencies": {
+	"dependencies": {
 		"marked": "^16.1.1"
 	}
 }
