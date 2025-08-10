@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-canvas-viewer",
-	"version": "2.0.1",
+	"version": "2.0.2",
 	"description": "A JavaScript-based viewer for Obsidian Canvas, easy to embed into websites.",
 	"main": "dist/canvasViewer.js",
 	"repository": {
