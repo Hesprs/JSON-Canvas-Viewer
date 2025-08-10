@@ -769,18 +769,22 @@ export default class canvasViewer {
 
 	// #region Load Canvas
 	/**
-	 * Load a canvas file (by path or object)
-	 * @param {string|Object} pathOrObject - Path to .canvas file or canvas data object
+	 * Load a canvas file (by path)
+	 * @param {string} path - Path to .canvas file
 	 */
-	async loadCanvas(pathOrObject) {
+	async loadCanvas(path) {
 		try {
-			if (/^https?:\/\//.test(pathOrObject)) this.canvasBaseDir = pathOrObject.substring(0, pathOrObject.lastIndexOf('/') + 1);
+			if (/^https?:\/\//.test(path)) this.canvasBaseDir = path.substring(0, path.lastIndexOf('/') + 1);
 			else {
-				const lastSlash = pathOrObject.lastIndexOf('/');
-				this.canvasBaseDir = lastSlash !== -1 ? pathOrObject.substring(0, lastSlash + 1) : './';
+				const lastSlash = path.lastIndexOf('/');
+				this.canvasBaseDir = lastSlash !== -1 ? path.substring(0, lastSlash + 1) : './';
 			}
-			this.canvasData = await fetch(pathOrObject).then(res => res.json());
+			this.canvasData = await fetch(path).then(res => res.json());
 			this.canvasData.nodes.forEach(node => {
+				if (node.type && node.type === 'file' && !node.file.includes('http')) {
+					const file = node.file.split('/');
+					node.file = file[file.length - 1];
+				}
 				this.nodeMap[node.id] = node;
 			});
 			this.buildSpatialGrid();
@@ -803,6 +807,7 @@ export default class canvasViewer {
 
 	buildSpatialGrid() {
 		if (!this.canvasData || this.canvasData.nodes.length < 50) return;
+		this.spatialGrid = {};
 		for (let node of this.canvasData.nodes) {
 			const minCol = Math.floor(node.x / this.GRID_CELL_SIZE);
 			const maxCol = Math.floor((node.x + node.width) / this.GRID_CELL_SIZE);

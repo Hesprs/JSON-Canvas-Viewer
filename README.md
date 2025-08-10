@@ -109,7 +109,7 @@ new canvasViewer(container, extensions, options);
 
 ### Methods
 
-- `loadCanvas(pathOrObject)` — Load a canvas file (by path or object)
+- `loadCanvas(path)` — Load a canvas file (by path), **please put all the related files (files embeded in the canvas) in the same folder as the canvas file, wherever they originally are**.
 - `interact(id)` — Interact with a node (select or preview, set `null` to deselect)
 - `on(event, callback)` — Listen for events (see below)
 - `setScale(scale)` — Set zoom level to a specific value (number, 0.05–20)

@@ -237,6 +237,7 @@ button {
 	overflow: hidden;
 	background-color: var(--background-color);
 	user-select: none;
+	contain: strict;
 	&:hover {
 		box-shadow: 0px 2px 12px rgb(0, 0, 0, 0.5);
 	}
@@ -279,9 +280,9 @@ button {
 }
 
 .link-iframe {
+	contain-intrinsic-size: 100% 100%;
 	@extend .full;
 	border: none;
-	transform: translateZ(0);
 }
 
 .link-click-layer {
@@ -491,7 +492,7 @@ table {
 	th,
 	td {
 		border: 1px solid rgba(255, 255, 255, 0.2);
-		padding: 8px 12px;
+		padding: 6px 10px;
 		background: rgba(255, 255, 255, 0.06);
 		text-align: left;
 	}
