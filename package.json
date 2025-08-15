@@ -1,6 +1,6 @@
 {
 	"name": "json-canvas-viewer",
-	"version": "3.0.1",
+	"version": "3.0.0",
 	"description": "A TypeScript-based viewer for JSON Canvas, easy to embed into websites.",
 	"type": "module",
 	"types": "dist/canvasViewer.d.ts",
