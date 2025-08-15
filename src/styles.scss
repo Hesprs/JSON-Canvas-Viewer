@@ -37,8 +37,6 @@ $colors: (
 }
 
 .container {
-	--preview-padding-x: 20px;
-	--preview-padding-y: 20px;
 	--themeColor: rgb(254, 247, 167);
 	--background-color: #141414;
 	--contentTransition: color 200ms, opacity 200ms, text-shadow 200ms, fill 200ms;
@@ -50,7 +48,6 @@ $colors: (
 	width: 100%;
 	height: 100%;
 	overflow: hidden;
-	touch-action: none;
 	background-color: var(--background-color);
 	&.numb, &.numb * {
 		pointer-events: none !important;

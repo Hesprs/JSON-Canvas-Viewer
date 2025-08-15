@@ -1,26 +1,36 @@
-import js from '@eslint/js';
+import typescriptEslint from '@typescript-eslint/eslint-plugin';
+import typescriptParser from '@typescript-eslint/parser';
 import globals from 'globals';
-import json from '@eslint/json';
-import markdown from '@eslint/markdown';
-import css from '@eslint/css';
 import prettier from 'eslint-config-prettier';
 import { defineConfig } from 'eslint/config';
 
+
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 export default defineConfig([
 	{
-		files: ['**/*.{js,mjs,cjs}'],
-		plugins: { js },
-		extends: ['js/recommended', prettier],
-		languageOptions: { globals: globals.browser },
+		files: ['**/*.ts', '**/*.tsx'],
+		extends: [prettier],
+		languageOptions: {
+			globals: globals.browser,
+			parser: typescriptParser,
+			parserOptions: {
+			  	ecmaVersion: 2022,
+			  	sourceType: 'module',
+			},
+		},
 		rules: {
+			...typescriptEslint.configs['recommended'].rules,
 			'no-unused-vars': ['error'],
-			'no-undef': ['error'],
+			'@typescript-eslint/no-unused-vars': 'warn',
+			'no-undef': 'off',
 			'no-unused-expressions': ['error'],
 			'no-unused-labels': ['error'],
 		},
+		plugins: { '@typescript-eslint': typescriptEslint },
 		ignores: ['**/dist/**', '**/node_modules/**', '**/vite.config.js', '**/.github/**', '**/.vscode/**', '**/.cursor/**'],
 	},
-	{ files: ['**/*.json'], plugins: { json }, language: 'json/json', extends: ['json/recommended'] },
-	{ files: ['**/*.md'], plugins: { markdown }, language: 'markdown/gfm', extends: ['markdown/recommended'] },
-	{ files: ['**/*.css'], plugins: { css }, language: 'css/css', extends: ['css/recommended'] },
 ]);

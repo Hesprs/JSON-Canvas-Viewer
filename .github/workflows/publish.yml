@@ -28,7 +28,7 @@ jobs:
         run: pnpm install
 
       - name: Build
-        run: pnpm build:external
+        run: pnpm build-for-distribution
 
       - name: Publish to npm
         run: pnpm publish --access public --no-git-checks

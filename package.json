@@ -1,8 +1,17 @@
 {
 	"name": "obsidian-canvas-viewer",
-	"version": "2.0.2",
-	"description": "A JavaScript-based viewer for Obsidian Canvas, easy to embed into websites.",
-	"main": "dist/canvasViewer.js",
+	"version": "3.0.0",
+	"description": "A TypeScript-based viewer for Obsidian Canvas, easy to embed into websites.",
+	"type": "module",
+	"types": "dist/canvasViewer.d.ts",
+	"main": "dist/canvasViewer.cjs.js",
+	"module": "dist/canvasViewer.esm.js",
+	"exports": {
+		".": {
+			"import": "./dist/my-library.esm.js",
+			"require": "./dist/my-library.cjs.js"
+		}
+	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/hesprs/Obsidian-Canvas-Viewer.git"
@@ -16,7 +25,8 @@
 		"JSON Canvas",
 		"Viewer",
 		"Front-end",
-		"HTML Canvas"
+		"HTML Canvas",
+		"TypeScript"
 	],
 	"author": {
 		"name": "Hēsperus",
@@ -25,25 +35,28 @@
 	"license": "MIT",
 	"packageManager": "pnpm@10.13.1",
 	"devDependencies": {
-		"@eslint/css": "^0.10.0",
-		"@eslint/js": "^9.32.0",
-		"@eslint/json": "^0.13.1",
-		"@eslint/markdown": "^7.1.0",
+		"@rollup/plugin-terser": "^0.4.4",
+		"@types/node": "^24.2.1",
+		"@typescript-eslint/eslint-plugin": "^8.39.1",
+		"@typescript-eslint/parser": "^8.39.1",
 		"cross-env": "^10.0.0",
 		"eslint": "^9.32.0",
 		"eslint-config-prettier": "^10.1.8",
 		"globals": "^16.3.0",
 		"sass": "^1.90.0",
+		"typescript": "^5.9.2",
 		"vite": "^7.1.1"
 	},
 	"files": [
-		"dist/canvasViewer.js"
+		"dist"
 	],
 	"scripts": {
-		"dev": "vite",
-		"build:external": "vite build",
-		"build:integrated": "cross-env VITE_BUILD_INTEGRATED=true vite build",
-		"build": "pnpm run build:external && pnpm run build:integrated"
+		"test": "vite --open",
+		"lint": "eslint .",
+		"build-types": "tsc --project tsconfig.json",
+		"build-for-distribution": "vite build && pnpm run build-types",
+		"build-standalone": "cross-env standalone=true vite build",
+		"build": "pnpm run build-for-distribution && pnpm run build-standalone"
 	},
 	"dependencies": {
 		"marked": "^16.1.2"
