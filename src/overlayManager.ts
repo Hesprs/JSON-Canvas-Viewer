@@ -1,10 +1,10 @@
 import { marked } from 'marked';
-import { RuntimeObsidianCanvasNode, unexpectedError, destroyError } from './renderer';
+import { RuntimeJSONCanvasNode, unexpectedError, destroyError } from './renderer';
 
 export default class overlayManager extends EventTarget {
 	private _overlaysLayer: HTMLDivElement | null;
 	private _overlays: Record<string, HTMLDivElement> | null;
-	private _nodeMap: Record<string, ObsidianCanvasNode> | null = null;
+	private _nodeMap: Record<string, JSONCanvasNode> | null = null;
 	private _canvasBaseDir: string | null = null;
 	private selectedId: string | null = null;
 	private eventListeners: Record<string, Array<EventListener | null>> = {};
@@ -34,7 +34,7 @@ export default class overlayManager extends EventTarget {
 		this._overlays = {}; // { id: node } the overlays in viewport
 	}
 
-	receiveData(canvasBaseDir: string, nodeMap: Record<string, ObsidianCanvasNode>) {
+	receiveData(canvasBaseDir: string, nodeMap: Record<string, JSONCanvasNode>) {
 		this._canvasBaseDir = canvasBaseDir;
 		this._nodeMap = nodeMap;
 	}
@@ -50,7 +50,7 @@ export default class overlayManager extends EventTarget {
 		this.selectedId = id;
 	}
 
-	private async loadMarkdownForNode(node: RuntimeObsidianCanvasNode) {
+	private async loadMarkdownForNode(node: RuntimeJSONCanvasNode) {
 		if (!node.mdContent) {
 			node.mdContent = 'Loading...';
 			this.updateOrCreateOverlay(node, node.mdContent, 'markdown');
@@ -82,14 +82,14 @@ export default class overlayManager extends EventTarget {
 		this.overlaysLayer.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
 		const neededOverlays = new Set();
 		const overlayCreators = {
-			text: (node: RuntimeObsidianCanvasNode) => {
+			text: (node: RuntimeJSONCanvasNode) => {
 				if (!node.text) throw unexpectedError;
 				if (node.inViewport) {
 					neededOverlays.add(node.id);
 					this.updateOrCreateOverlay(node, node.text, 'text');
 				}
 			},
-			file: (node: RuntimeObsidianCanvasNode) => {
+			file: (node: RuntimeJSONCanvasNode) => {
 				if (!node.file) throw unexpectedError;
 				if (node.inViewport) {
 					neededOverlays.add(node.id);
@@ -97,7 +97,7 @@ export default class overlayManager extends EventTarget {
 					else if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) this.updateOrCreateOverlay(node, this.canvasBaseDir + node.file, 'image');
 				}
 			},
-			link: (node: RuntimeObsidianCanvasNode) => {
+			link: (node: RuntimeJSONCanvasNode) => {
 				if (!node.url) throw unexpectedError;
 				neededOverlays.add(node.id);
 				this.updateOrCreateOverlay(node, node.url, 'link');
@@ -114,7 +114,7 @@ export default class overlayManager extends EventTarget {
 		});
 	}
 
-	private async updateOrCreateOverlay(node: RuntimeObsidianCanvasNode, content: string, type: string) {
+	private async updateOrCreateOverlay(node: RuntimeJSONCanvasNode, content: string, type: string) {
 		let element = this.overlays[node.id];
 		if (!element) {
 			element = await this.constructOverlay(node, content, type);
@@ -133,7 +133,7 @@ export default class overlayManager extends EventTarget {
 		}
 	}
 
-	private async constructOverlay(node: RuntimeObsidianCanvasNode, content: string, type: string) {
+	private async constructOverlay(node: RuntimeJSONCanvasNode, content: string, type: string) {
 		const overlay = document.createElement('div');
 		overlay.classList.add('overlay-container');
 		overlay.id = node.id;

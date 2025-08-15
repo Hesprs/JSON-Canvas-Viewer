@@ -29,7 +29,7 @@ export default defineConfig({
 	root: resolve(__dirname, 'example'),
 	resolve: {
 		alias: {
-			'obsidian-canvas-viewer': resolve(__dirname, 'src/canvasViewer.ts'),
+			'json-canvas-viewer': resolve(__dirname, 'src/canvasViewer.ts'),
 		},
 	},
 	build: {

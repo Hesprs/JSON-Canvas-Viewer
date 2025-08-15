@@ -1,7 +1,7 @@
 {
-	"name": "obsidian-canvas-viewer",
-	"version": "3.0.0",
-	"description": "A TypeScript-based viewer for Obsidian Canvas, easy to embed into websites.",
+	"name": "json-canvas-viewer",
+	"version": "3.0.1",
+	"description": "A TypeScript-based viewer for JSON Canvas, easy to embed into websites.",
 	"type": "module",
 	"types": "dist/canvasViewer.d.ts",
 	"main": "dist/canvasViewer.cjs.js",
@@ -14,11 +14,11 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/hesprs/Obsidian-Canvas-Viewer.git"
+		"url": "git+https://github.com/hesprs/JSON-Canvas-Viewer.git"
 	},
-	"homepage": "https://github.com/hesprs/Obsidian-Canvas-Viewer#readme",
+	"homepage": "https://github.com/hesprs/JSON-Canvas-Viewer#readme",
 	"bugs": {
-		"url": "https://github.com/hesprs/Obsidian-Canvas-Viewer/issues"
+		"url": "https://github.com/hesprs/JSON-Canvas-Viewer/issues"
 	},
 	"keywords": [
 		"Obsidian",

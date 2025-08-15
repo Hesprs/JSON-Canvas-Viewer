@@ -2,8 +2,8 @@ import { getColor, drawRoundRect, getAnchorCoord, destroyError, resizeCanvasForD
 
 export default class minimap extends EventTarget {
 	private _minimapCtx: CanvasRenderingContext2D | null;
-	private _canvasData: ObsidianCanvas | null = null;
-	private _nodeMap: Record<string, ObsidianCanvasNode> | null = null;
+	private _canvasData: JSONCanvas | null = null;
+	private _nodeMap: Record<string, JSONCanvasNode> | null = null;
 	private _nodeBounds: {
 		minX: number;
 		minY: number;
@@ -98,7 +98,7 @@ export default class minimap extends EventTarget {
 		resizeCanvasForDPR(minimapCanvas, minimapCanvas.width, minimapCanvas.height);
 	}
 
-	receiveData(nodeBounds: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number; centerX: number; centerY: number }, canvasData: ObsidianCanvas, nodeMap: Record<string, ObsidianCanvasNode>) {
+	receiveData(nodeBounds: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number; centerX: number; centerY: number }, canvasData: JSONCanvas, nodeMap: Record<string, JSONCanvasNode>) {
 		this._nodeBounds = nodeBounds;
 		this._canvasData = canvasData;
 		this._nodeMap = nodeMap;
@@ -131,7 +131,7 @@ export default class minimap extends EventTarget {
 		this.minimapCtx.restore();
 	}
 
-	private drawMinimapNode(node: ObsidianCanvasNode) {
+	private drawMinimapNode(node: JSONCanvasNode) {
 		const colors = getColor(node.color);
 		const radius = 25;
 		this.minimapCtx.fillStyle = colors.border;
@@ -141,7 +141,7 @@ export default class minimap extends EventTarget {
 		this.minimapCtx.globalAlpha = 1.0;
 	}
 
-	private drawMinimapEdge(edge: ObsidianCanvasEdge) {
+	private drawMinimapEdge(edge: JSONCanvasEdge) {
 		const fromNode = this.nodeMap[edge.fromNode];
 		const toNode = this.nodeMap[edge.toNode];
 		if (!fromNode || !toNode) return;

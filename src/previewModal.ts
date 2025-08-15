@@ -1,4 +1,4 @@
-import { RuntimeObsidianCanvasNode, unexpectedError, destroyError } from './renderer';
+import { RuntimeJSONCanvasNode, unexpectedError, destroyError } from './renderer';
 
 export default class previewModal extends EventTarget {
 	private _previewModalBackdrop: HTMLDivElement | null;
@@ -56,7 +56,7 @@ export default class previewModal extends EventTarget {
 		this._canvasBaseDir = canvasBaseDir;
 	}
 
-	showPreviewModal(node: RuntimeObsidianCanvasNode) {
+	showPreviewModal(node: RuntimeJSONCanvasNode) {
 		const content = this.processContent(node);
 		if (!content) throw unexpectedError;
 		this.previewModalContent.innerHTML = '';
@@ -77,7 +77,7 @@ export default class previewModal extends EventTarget {
 		this.previewModal.style.setProperty('--preview-max-height', `${height * 0.9}px`);
 	}
 
-	private processContent(node: RuntimeObsidianCanvasNode) {
+	private processContent(node: RuntimeJSONCanvasNode) {
 		if (!node.file) throw unexpectedError;
 		let content;
 		if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) {

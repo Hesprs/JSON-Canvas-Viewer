@@ -22,8 +22,8 @@ export default class canvasViewer extends EventTarget {
 	private mistouchPreventer: mistouchPreventer | null = null;
 	private canvasBaseDir: null | string = null;
 	private animationId: null | number = null;
-	private _canvasData: ObsidianCanvas | null = null;
-	private _nodeMap: Record<string, ObsidianCanvasNode> | null = null;
+	private _canvasData: JSONCanvas | null = null;
+	private _nodeMap: Record<string, JSONCanvasNode> | null = null;
 	private _nodeBounds: {
 		minX: number;
 		minY: number;
@@ -45,7 +45,7 @@ export default class canvasViewer extends EventTarget {
 	private offsetX: number;
 	private offsetY: number;
 	private scale: number;
-	private spatialGrid: Record<string, Array<ObsidianCanvasNode>> | null = null;
+	private spatialGrid: Record<string, Array<JSONCanvasNode>> | null = null;
 	private ZOOM_SMOOTHNESS: number;
 	private INITIAL_VIEWPORT_PADDING: number;
 	private perFrame: {
@@ -148,7 +148,7 @@ export default class canvasViewer extends EventTarget {
 	}
 
 	private findNodeAt({ x, y }: Coordinates) {
-		let candidates: Array<ObsidianCanvasNode> = [];
+		let candidates: Array<JSONCanvasNode> = [];
 		if (!this.spatialGrid) candidates = this.canvasData.nodes;
 		else {
 			const col = Math.floor(x / this.GRID_CELL_SIZE);
@@ -184,7 +184,7 @@ export default class canvasViewer extends EventTarget {
 		};
 	}
 
-	private judgeInteract(node: ObsidianCanvasNode | undefined) {
+	private judgeInteract(node: JSONCanvasNode | undefined) {
 		// how should the app handle node interactions
 		const type = !node ? 'default' : node.type;
 		switch (type) {
@@ -378,7 +378,7 @@ export default class canvasViewer extends EventTarget {
 			}
 			this._canvasData = await fetch(path).then(res => res.json());
 			this._nodeMap = {};
-			this.canvasData.nodes.forEach((node: ObsidianCanvasNode) => {
+			this.canvasData.nodes.forEach((node: JSONCanvasNode) => {
 				if (node.type === 'file' && node.file && !node.file.includes('http')) {
 					const file = node.file.split('/');
 					node.file = file[file.length - 1];
@@ -419,7 +419,7 @@ export default class canvasViewer extends EventTarget {
 			}
 
 			if (!this.extensions.includes('mistouchPrevention') || this.options.includes('noPreventionAtStart')) this.animationId = requestAnimationFrame(this.draw);
-			this.dispatchEvent(new CustomEvent<ObsidianCanvas>('loaded', { detail: this.canvasData }));
+			this.dispatchEvent(new CustomEvent<JSONCanvas>('loaded', { detail: this.canvasData }));
 		} catch (err) {
 			console.error('Failed to load canvas data:', err);
 		}

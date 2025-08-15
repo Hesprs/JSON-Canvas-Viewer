@@ -1,17 +1,17 @@
-# Obsidian Canvas Viewer
+# JSON Canvas Viewer
 
 ![TypeScript](https://badgen.net/badge/-/Strict?icon=typescript&label=TypeScript&labelColor=blue&color=555555)
-[![npm](https://badgen.net/npm/v/obsidian-canvas-viewer?icon=npm&labelColor=red&color=555555)](https://www.npmjs.com/package/obsidian-canvas-viewer)
-[![publish size](https://badgen.net/packagephobia/publish/obsidian-canvas-viewer?labelColor=green&color=555555)](https://packagephobia.now.sh/result?p=obsidian-canvas-viewer)
-[![GitHub commits](https://badgen.net/github/commits/hesprs/Obsidian-Canvas-Viewer?icon=git&labelColor=purple&color=555555)](https://github.com/hesprs/Obsidian-Canvas-Viewer/commits/main)
+[![npm](https://badgen.net/npm/v/json-canvas-viewer?icon=npm&labelColor=red&color=555555)](https://www.npmjs.com/package/json-canvas-viewer)
+[![publish size](https://badgen.net/packagephobia/publish/json-canvas-viewer?labelColor=green&color=555555)](https://packagephobia.now.sh/result?p=json-canvas-viewer)
+[![GitHub commits](https://badgen.net/github/commits/hesprs/JSON-Canvas-Viewer?icon=git&labelColor=purple&color=555555)](https://github.com/hesprs/JSON-Canvas-Viewer/commits/main)
 
 ![Canvas Viewer](example/preview.png)
 
-A **TypeScript-based** viewer for **Obsidian Canvas** files. View and interact with your canvas files directly in the browser, or embed the viewer in front-end projects with ease. It is built without any web framework so it can be easily integrated into any framework.
+A **TypeScript-based** viewer for **JSON Canvas** files. View and interact with your canvas files directly in the browser, or embed the viewer in front-end projects with ease. It is built without any web framework so it can be easily integrated into any framework.
 
 This project is inspired by [sofanati-nour/obsidian-canvas-web-renderer](https://github.com/sofanati-nour/obsidian-canvas-web-renderer), but is far more developed and optimized.
 
-For more about **Obsidian Canvas**, also known as **JSON Canvas**, please visit [jsoncanvas.org](https://jsoncanvas.org/).
+For more about **JSON Canvas**, also known as **Obsidian Canvas**, please visit [jsoncanvas.org](https://jsoncanvas.org/).
 
 ## 📦 Installation
 
@@ -19,22 +19,22 @@ We recommend using your favorite package manager to install the package. **Note:
 
 ``` bash
 # npm
-npm install obsidian-canvas-viewer
+npm install json-canvas-viewer
 
 # pnpm
-pnpm add obsidian-canvas-viewer
+pnpm add json-canvas-viewer
 
 # yarn
-yarn add obsidian-canvas-viewer
+yarn add json-canvas-viewer
 ```
 
-The integrated version is a choice if your project *doesn't use Node.js*, which is built with `marked` and `obsidian-canvas-viewer` inlined, so it can be deployed in vanilla JavaScript projects. Find the integrated version in [Release page](https://github.com/hesprs/Obsidian-Canvas-Viewer/releases).
+The integrated version is a choice if your project *doesn't use Node.js*, which is built with `marked` and `json-canvas-viewer` inlined, so it can be deployed in vanilla JavaScript projects. Find the integrated version in [Release page](https://github.com/hesprs/JSON-Canvas-Viewer/releases).
 
 After installation, you can import the package as a module. It supports both ES module and Common JS, here we take ESM as example:
 
 ``` TypeScript
 // with Node.js
-import canvasViewer from 'obsidian-canvas-viewer';
+import canvasViewer from 'json-canvas-viewer';
 
 // using integrated version
 import canvasViewer from 'path/to/canvasViewer.js';
@@ -141,7 +141,7 @@ Register with `viewer.addEventListener(event, callback)`.
 
 ## 📂 Canvas File Structure
 
-The viewer expects Obsidian Canvas files in JSON format:
+The viewer expects JSON Canvas files in JSON format:
 
 ``` JSON
 {

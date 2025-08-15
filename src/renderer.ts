@@ -5,27 +5,27 @@ interface viewport {
 	bottom: number;
 }
 
-export interface RuntimeObsidianCanvasNode extends ObsidianCanvasNode {
+export interface RuntimeJSONCanvasNode extends JSONCanvasNode {
 	inViewport?: boolean;
 	mdContent?: string;
 	mdFrontmatter?: Record<string, string>;
 }
 
-interface RuntimeObsidianCanvasEdge extends ObsidianCanvasEdge {
+interface RuntimeJSONCanvasEdge extends JSONCanvasEdge {
 	controlPoints?: Array<number>;
 }
 
-interface RuntimeObsidianCanvas extends ObsidianCanvas {
-	nodes: Array<RuntimeObsidianCanvasNode>;
-	edges: Array<RuntimeObsidianCanvasEdge>;
+interface RuntimeJSONCanvas extends JSONCanvas {
+	nodes: Array<RuntimeJSONCanvasNode>;
+	edges: Array<RuntimeJSONCanvasEdge>;
 }
 
 export const unexpectedError = new Error('This error is unexpected, probably caused by file corruption. If you assure the error is not caused by accident, please contact the author and show how to reproduce.');
 export const destroyError = new Error("Resource hasn't been set up or has been disposed.");
 
 export class renderer {
-	private _nodeMap: Record<string, ObsidianCanvasNode> | null = null;
-	private _canvasData: RuntimeObsidianCanvas | null = null;
+	private _nodeMap: Record<string, JSONCanvasNode> | null = null;
+	private _canvasData: RuntimeJSONCanvas | null = null;
 	private _canvas: HTMLCanvasElement | null;
 	private _ctx: CanvasRenderingContext2D | null;
 	private _container: HTMLElement | null;
@@ -82,7 +82,7 @@ export class renderer {
 		resizeCanvasForDPR(this._canvas, canvasContainer.offsetWidth, canvasContainer.offsetHeight);
 	}
 
-	receiveData(nodeMap: Record<string, ObsidianCanvasNode>, canvasDava: ObsidianCanvas) {
+	receiveData(nodeMap: Record<string, JSONCanvasNode>, canvasDava: JSONCanvas) {
 		this._nodeMap = nodeMap;
 		this._canvasData = canvasDava;
 	}
@@ -160,7 +160,7 @@ export class renderer {
 		return inner.left > outer.left && inner.top > outer.top && inner.right < outer.right && inner.bottom < outer.bottom;
 	}
 
-	private isNodeInViewport(node: ObsidianCanvasNode, offsetX: number, offsetY: number, scale: number, margin = 200) {
+	private isNodeInViewport(node: JSONCanvasNode, offsetX: number, offsetY: number, scale: number, margin = 200) {
 		const viewLeft = -offsetX / scale - margin;
 		const viewTop = -offsetY / scale - margin;
 		const viewRight = viewLeft + this.container.clientWidth / scale + 2 * margin;
@@ -206,7 +206,7 @@ export class renderer {
 		this.ctx.restore();
 	}
 
-	private drawNodeBackground(node: ObsidianCanvasNode) {
+	private drawNodeBackground(node: JSONCanvasNode) {
 		const colors = getColor(node.color);
 		const radius = this.FILE_NODE_RADIUS;
 		this.ctx.globalAlpha = 1.0;
@@ -219,12 +219,12 @@ export class renderer {
 		this.ctx.stroke();
 	}
 
-	private drawGroup(node: ObsidianCanvasNode, scale: number) {
+	private drawGroup(node: JSONCanvasNode, scale: number) {
 		this.drawNodeBackground(node);
 		if (node.label) this.drawLabelBar(node.x, node.y, node.label, getColor(node.color).border, scale);
 	}
 
-	private drawFileNode(node: ObsidianCanvasNode) {
+	private drawFileNode(node: JSONCanvasNode) {
 		if (!node.file) throw unexpectedError;
 		if (!node.file.match(/\.md|png|jpg|jpeg|gif|svg$/i)) {
 			this.drawNodeBackground(node);
@@ -241,7 +241,7 @@ export class renderer {
 		this.ctx.fillText(node.file, node.x + 5, node.y - 10);
 	}
 
-	private drawEdge(edge: RuntimeObsidianCanvasEdge) {
+	private drawEdge(edge: RuntimeJSONCanvasEdge) {
 		const { fromNode, toNode } = this.getEdgeNodes(edge);
 		if (!fromNode || !toNode) throw unexpectedError;
 		const [startX, startY] = getAnchorCoord(fromNode, edge.fromSide);
@@ -275,7 +275,7 @@ export class renderer {
 		}
 	}
 
-	private getEdgeNodes(edge: ObsidianCanvasEdge) {
+	private getEdgeNodes(edge: JSONCanvasEdge) {
 		return {
 			fromNode: this.nodeMap[edge.fromNode],
 			toNode: this.nodeMap[edge.toNode],
@@ -353,7 +353,7 @@ export class renderer {
 	}
 }
 
-export function getAnchorCoord(node: ObsidianCanvasNode, side: 'top' | 'bottom' | 'left' | 'right') {
+export function getAnchorCoord(node: JSONCanvasNode, side: 'top' | 'bottom' | 'left' | 'right') {
 	const midX = node.x + node.width / 2;
 	const midY = node.y + node.height / 2;
 	switch (side) {
