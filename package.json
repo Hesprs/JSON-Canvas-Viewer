@@ -1,6 +1,6 @@
 {
 	"name": "json-canvas-viewer",
-	"version": "3.0.1",
+	"version": "3.0.2",
 	"description": "A TypeScript-based viewer for JSON Canvas, easy to embed into websites.",
 	"type": "module",
 	"types": "dist/canvasViewer.d.ts",
@@ -8,6 +8,7 @@
 	"module": "dist/canvasViewer.esm.js",
 	"exports": {
 		".": {
+			"types": "./dist/canvasViewer.d.ts",
 			"import": "./dist/canvasViewer.esm.js",
 			"require": "./dist/canvasViewer.cjs.js"
 		}
