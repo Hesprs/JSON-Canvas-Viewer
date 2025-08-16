@@ -46,23 +46,24 @@ export default class canvasViewer extends EventTarget {
 	private offsetY: number;
 	private scale: number;
 	private spatialGrid: Record<string, Array<JSONCanvasNode>> | null = null;
-	private ZOOM_SMOOTHNESS: number;
-	private INITIAL_VIEWPORT_PADDING: number;
+	private ZOOM_SMOOTHNESS: number = 0.25;
+	private INITIAL_VIEWPORT_PADDING: number = 100;
+	private GRID_CELL_SIZE: number = 800;
 	private perFrame: {
 		needAnimating: boolean;
 		zoom: boolean;
 		smoothZoom: boolean;
 		targetScale: number;
 		pan: boolean;
-		resize: boolean;
-		resizeScale: {
-			width: number;
-			height: number;
-			lastCentreX: null | number;
-			lastCentreY: null | number;
+	};
+	private resizeState: {
+		resizeTimeout: NodeJS.Timeout | null;
+		lastCallTime: number;
+		center: {
+			lastX: null | number;
+			lastY: null | number;
 		};
 	};
-	private GRID_CELL_SIZE: number;
 
 	private get canvasData() {
 		if (this._canvasData === null) throw destroyError;
@@ -120,11 +121,6 @@ export default class canvasViewer extends EventTarget {
 		this.offsetY = 0;
 		this.scale = 1.0;
 
-		// === Constants ===
-		this.ZOOM_SMOOTHNESS = 0.25; // Adjust this value to control zoom smoothness (0-1)
-		this.INITIAL_VIEWPORT_PADDING = 100;
-		this.GRID_CELL_SIZE = 800;
-
 		// === State Variables ===
 		this.perFrame = {
 			needAnimating: false,
@@ -132,12 +128,13 @@ export default class canvasViewer extends EventTarget {
 			smoothZoom: false,
 			targetScale: 1,
 			pan: false,
-			resize: false,
-			resizeScale: {
-				width: 0,
-				height: 0,
-				lastCentreX: null,
-				lastCentreY: null,
+		};
+		this.resizeState = {
+			resizeTimeout: null,
+			lastCallTime: 0,
+			center: {
+				lastX: null,
+				lastY: null,
 			},
 		};
 	}
@@ -249,7 +246,7 @@ export default class canvasViewer extends EventTarget {
 
 	// === Render Loop ===
 	private draw = () => {
-		if (!this.perFrame.needAnimating && !this.perFrame.pan && !this.perFrame.resize && !this.perFrame.zoom && !this.perFrame.smoothZoom) {
+		if (!this.perFrame.needAnimating && !this.perFrame.pan && !this.perFrame.zoom && !this.perFrame.smoothZoom) {
 			this.animationId = requestAnimationFrame(this.draw);
 			return;
 		}
@@ -266,24 +263,28 @@ export default class canvasViewer extends EventTarget {
 			this.interactor.resetPanDump();
 		}
 		if (this.perFrame.smoothZoom) this.smoothZoom();
-		if (this.perFrame.resize) this.resize();
-		this.renderer.redraw(this.offsetX, this.offsetY, this.scale);
-		this.overlayManager.updateAllOverlays(this.offsetX, this.offsetY, this.scale);
-		if (this.minimap) this.minimap.updateViewportRectangle(this.offsetX, this.offsetY, this.scale); // Extension: Minimap
+		this.refresh();
 		this.animationId = requestAnimationFrame(this.draw);
 	};
 
+	private refresh() {
+		this.renderer.redraw(this.offsetX, this.offsetY, this.scale);
+		this.overlayManager.updateAllOverlays(this.offsetX, this.offsetY, this.scale);
+		if (this.minimap) this.minimap.updateViewportRectangle(this.offsetX, this.offsetY, this.scale); // Extension: Minimap
+	}
+
 	private resize() {
-		this.perFrame.resize = false;
-		const params = this.perFrame.resizeScale;
-		if (params.lastCentreX && params.lastCentreY) {
-			this.offsetX += params.width / 2 - params.lastCentreX;
-			this.offsetY += params.height / 2 - params.lastCentreY;
+		const params = this.resizeState.center;
+		const center = this.middleScreen();
+		if (params.lastX && params.lastY) {
+			this.offsetX += center.x - params.lastX;
+			this.offsetY += center.y - params.lastY;
 		}
-		params.lastCentreX = params.width / 2;
-		params.lastCentreY = params.height / 2;
+		params.lastX = center.x;
+		params.lastY = center.y;
 		this.renderer.resizeCanvasForDPR();
-		this.previewModal.resize(params.width, params.height);
+		this.previewModal.resize(center.x * 2, center.y * 2);
+		this.refresh();
 	}
 
 	private pan({ x, y }: Coordinates) {
@@ -327,9 +328,22 @@ export default class canvasViewer extends EventTarget {
 		} else throw unexpectedError;
 	};
 	private onResize = () => {
-		this.perFrame.resize = true;
-		this.perFrame.resizeScale.width = this.container.clientWidth;
-		this.perFrame.resizeScale.height = this.container.clientHeight;
+		if (this.resizeState.resizeTimeout) {
+			clearTimeout(this.resizeState.resizeTimeout);
+			this.resizeState.resizeTimeout = null;
+		}
+		const now = Date.now();
+		const timeSinceLast = now - this.resizeState.lastCallTime;
+		if (timeSinceLast < 100) {
+			this.resizeState.resizeTimeout = setTimeout(() => {
+				this.resize();
+				this.resizeState.lastCallTime = now;
+				this.resizeState.resizeTimeout = null;
+			}, 60);
+			return;
+		}
+		this.resizeState.lastCallTime = now;
+		this.resize();
 	};
 	private onPan = () => (this.perFrame.pan = true);
 	private onZoom = () => (this.perFrame.zoom = true);
@@ -457,6 +471,10 @@ export default class canvasViewer extends EventTarget {
 	};
 
 	dispose() {
+		if (this.resizeState.resizeTimeout) {
+			clearTimeout(this.resizeState.resizeTimeout);
+			this.resizeState.resizeTimeout = null;
+		}
 		this.interactor.removeEventListener('trueClick', this.onClick);
 		this.interactor.removeEventListener('pan', this.onPan);
 		this.interactor.removeEventListener('zoom', this.onZoom);

@@ -26,6 +26,7 @@ export default class interactor extends EventTarget {
 	private zoomFactor: number;
 	private preventDefault: boolean;
 	private lockControlSchema: boolean;
+	private ctrlZoomFactor: number;
 
 	private get monitoringElement() {
 		if (this._monitoringElement === null) throw destroyError;
@@ -39,6 +40,7 @@ export default class interactor extends EventTarget {
 		this.preventDefault = option.preventDefault || false;
 		this.proControlSchema = option.proControlSchema || false;
 		this.zoomFactor = option.zoomFactor || 0.002;
+		this.ctrlZoomFactor = option.zoomFactor ? option.zoomFactor * 50 : 0.1;
 		this.lockControlSchema = option.lockControlSchema || false;
 		this.pointers.clear();
 		this.pinchZoomState = {
@@ -157,10 +159,16 @@ export default class interactor extends EventTarget {
 	};
 
 	private onWheel = (e: WheelEvent) => {
-		if (!this.lockControlSchema && !this.proControlSchema && (e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY))) this.proControlSchema = true;
+		if (!this.lockControlSchema && !this.proControlSchema && (e.ctrlKey || e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY))) this.proControlSchema = true;
 		if (this.preventDefault) e.preventDefault();
-		if (this.proControlSchema && !e.ctrlKey) this.dispatchPanEvent({ x: e.deltaX, y: e.deltaY });
-		else {
+		if (this.proControlSchema) {
+			if (e.ctrlKey) {
+				const scaleFactor = e.deltaY > 0 ? 1 - this.ctrlZoomFactor : 1 + this.ctrlZoomFactor;
+				const origin = this.S2C({ x: e.clientX, y: e.clientY });
+				this.dispatchZoomEvent(scaleFactor, origin);
+			} else if (e.shiftKey && Math.abs(e.deltaX) <= Math.abs(e.deltaY)) this.dispatchPanEvent({ x: -e.deltaY, y: -e.deltaX });
+			else this.dispatchPanEvent({ x: -e.deltaX, y: -e.deltaY });
+		} else {
 			const scaleFactor = 1 - this.zoomFactor * e.deltaY;
 			const origin = this.S2C({ x: e.clientX, y: e.clientY });
 			this.dispatchZoomEvent(scaleFactor, origin);

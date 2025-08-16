@@ -50,16 +50,4 @@ export default defineConfig({
 		open: '/',
 	},
 	publicDir: resolve(__dirname, 'dist'),
-	plugins: [
-		{
-			name: 'typescript-diagnostics',
-			configureServer(server) {
-				server.watcher.on('all', (event, path) => {
-					if (path.endsWith('.ts') && event === 'change') {
-						require('typescript').transpileModule(require('fs').readFileSync(path, 'utf-8'), { compilerOptions: require('./tsconfig.json').compilerOptions });
-					}
-				});
-			},
-		},
-	],
 });

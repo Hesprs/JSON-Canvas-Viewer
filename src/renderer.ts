@@ -20,7 +20,7 @@ interface RuntimeJSONCanvas extends JSONCanvas {
 	edges: Array<RuntimeJSONCanvasEdge>;
 }
 
-export const unexpectedError = new Error('This error is unexpected, probably caused by file corruption. If you assure the error is not caused by accident, please contact the author and show how to reproduce.');
+export const unexpectedError = new Error('This error is unexpected, probably caused by canvas file corruption. If you assure the error is not by accident, please contact the developer and show how to reproduce.');
 export const destroyError = new Error("Resource hasn't been set up or has been disposed.");
 
 export class renderer {
@@ -99,7 +99,7 @@ export class renderer {
 		const now = Date.now();
 		const currentViewport = this.getCurrentViewport(offsetX, offsetY, scale);
 		if (this.isViewportInside(currentViewport, this.zoomInOptimize.lastDrawnViewport) && scale !== this.zoomInOptimize.lastDrawnScale) {
-			const timeSinceLast: number = now - this.zoomInOptimize.lastCallTime;
+			const timeSinceLast = now - this.zoomInOptimize.lastCallTime;
 			if (timeSinceLast < this.CSS_ZOOM_REDRAW_INTERVAL) {
 				this.zoomInOptimize.timeout = setTimeout(() => {
 					this.trueRedraw(offsetX, offsetY, scale, currentViewport);
@@ -115,10 +115,12 @@ export class renderer {
 	}
 
 	dispose() {
-		if (this.zoomInOptimize.timeout) clearTimeout(this.zoomInOptimize.timeout);
+		if (this.zoomInOptimize.timeout) {
+			clearTimeout(this.zoomInOptimize.timeout);
+			this.zoomInOptimize.timeout = null;
+		}
 		this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 		this.canvas.remove();
-		this.zoomInOptimize.timeout = null;
 		this._ctx = null;
 		this._canvas = null;
 		this._container = null;

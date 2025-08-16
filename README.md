@@ -79,7 +79,7 @@ If you are coding in TypeScript, and intend to retrieve Custom Event callback, p
 const viewer: canvasViewer = new canvasViewer(...);
 viewer.loadCanvas(...);
 viewer.addEventListener('...', (e: Event) => {
-	if (e instanceof CustomEvent) {
+    if (e instanceof CustomEvent) {
         // use e.detail safely here
         console.log(e.detail);
     };
