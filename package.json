@@ -15,11 +15,11 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/hesprs/JSON-Canvas-Viewer.git"
+		"url": "git+https://github.com/Hesprs/JSON-Canvas-Viewer.git"
 	},
-	"homepage": "https://github.com/hesprs/JSON-Canvas-Viewer#readme",
+	"homepage": "https://github.com/Hesprs/JSON-Canvas-Viewer#readme",
 	"bugs": {
-		"url": "https://github.com/hesprs/JSON-Canvas-Viewer/issues"
+		"url": "https://github.com/Hesprs/JSON-Canvas-Viewer/issues"
 	},
 	"keywords": [
 		"Obsidian",

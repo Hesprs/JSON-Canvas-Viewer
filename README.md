@@ -116,10 +116,11 @@ new canvasViewer(container, extensions, options);
     - `minimap` - Adds navigation minimap
     - `mistouchPrevention` - Frozes canvas when clicking outside. **Warning: navigation methods (like `zoomIn()` or `resetView()`) cannot take effect if the canvas is frozen**.
 - `options`: (optional) Array (or space-separated string in case of custom element) of config options:
-    - `minimapCollapsed` - Starts with minimap collapsed
     - `controlsHidden` - Hides the control panel
     - `controlsCollapsed` - Starts with controls collapsed
     - `proControlSchema` - Uses control keybindings in professional softwares (`mouse wheel`: scroll vertically; `mouse wheel` + `shift`: scroll horizontally; `mouse wheel` + `ctrl`: zoom), rather than mouse wheel to zoom. The canvas viewer automatically detect and adjust control schema by default, but you can explicitly configure it. This option doesn't affect mobile control.
+    - `noPreventionAtStart` (avaliable when mistouchPrevention enabled) Starts without prevention
+    - `minimapCollapsed` - (avaliable when minimap enabled) Starts with minimap collapsed
 
 ### Methods
 
@@ -130,7 +131,7 @@ new canvasViewer(container, extensions, options);
 - `zoomOut()` — Zoom out by a fixed step
 - `setScale(scale)` — Set zoom level to a specific value (number, 0.05–20)
 - `panTo(x, y)` — Pan the view to a specific world coordinate
-- `destroy()` — Clean up and remove viewer from DOM
+- `dispose()` — Clean up and remove viewer from DOM
 
 ### Events
 
