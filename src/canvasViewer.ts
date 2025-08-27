@@ -84,13 +84,20 @@ export default class canvasViewer extends EventTarget {
 
 	constructor(container: HTMLElement, extensions: Array<string> = [], options: Array<string> = []) {
 		super();
-		const shadowContainer = container.attachShadow({ mode: 'open' });
+		while (container.firstElementChild) container.firstElementChild.remove();
+		container.innerHTML = '';
+		
 		const style = document.createElement('style');
 		style.innerHTML = styles;
+		let realContainer: HTMLElement | ShadowRoot;
 
-		shadowContainer.appendChild(style);
+		if (options.includes('noShadow')) realContainer = container;
+		else realContainer = container.attachShadow({ mode: 'open' });
+
+		realContainer.appendChild(style);
 		this._container = document.createElement('div');
 		this._container.classList.add('container');
+		realContainer.appendChild(this._container);
 
 		this.renderer = new renderer(this._container);
 		this.overlayManager = new overlayManager(this._container);
@@ -111,7 +118,7 @@ export default class canvasViewer extends EventTarget {
 		// Extension: Mistouch Prevention
 		if (extensions.includes('mistouchPrevention')) this.mistouchPreventer = new mistouchPreventer(this._container, !options.includes('noPreventionAtStart'));
 
-		shadowContainer.appendChild(this._container);
+		realContainer.appendChild(this._container);
 
 		this.extensions = extensions;
 		this.options = options;

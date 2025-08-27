@@ -4,7 +4,6 @@
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<title>Canvas Viewer</title>
-	<!-- <script type="module" src="/canvasViewer.js"></script> -->
 	<style>
 		body,
 		html {
@@ -27,7 +26,7 @@
 	const viewer = new canvasViewer(
 		document.body,
 		['minimap', 'mistouchPrevention'],
-		['minimapCollapsed']
+		['minimapCollapsed', 'noShadow']
 	);
 	viewer.loadCanvas('Example Canvas/introduction.canvas');
 </script>

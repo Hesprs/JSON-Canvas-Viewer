@@ -7,7 +7,7 @@
 
 ![Canvas Viewer](example/preview.png)
 
-A **TypeScript-based** viewer for **JSON Canvas** files. View and interact with your canvas files directly in the browser, or embed the viewer in front-end projects with ease. It is built without any web framework so it can be easily integrated into any framework.
+A **TypeScript-based** viewer for **JSON Canvas** files. View and interact with your canvas files directly in the browser, or embed the viewer in front-end projects with ease. It is built without frameworks so it can be easily integrated into any framework.
 
 This project is inspired by [sofanati-nour/obsidian-canvas-web-renderer](https://github.com/sofanati-nour/obsidian-canvas-web-renderer), but is far more developed and optimized.
 
@@ -93,10 +93,10 @@ viewer.addEventListener('...', (e: Event) => {
 - Embed into front-end projects using a container element or custom element
 - Interactive pan and zoom functionality
 - Support for different node types:
-    - Text nodes
-    - File nodes (including Markdown files)
-    - Link nodes (embedded web content)
-    - Group nodes with custom colors
+  - Text nodes
+  - File nodes (including Markdown files)
+  - Link nodes (embedded web content)
+  - Group nodes with custom colors
 - Edge connections between nodes with labels
 - Minimap for easy navigation (optional extension)
 - Mistouch prevention (optional extension)
@@ -113,14 +113,15 @@ new canvasViewer(container, extensions, options);
 
 - `container`: HTMLElement where the viewer will be rendered
 - `extensions`: (optional) Array (or space-separated string in case of custom element) of extension names to enable:
-    - `minimap` - Adds navigation minimap
-    - `mistouchPrevention` - Frozes canvas when clicking outside. **Warning: navigation methods (like `zoomIn()` or `resetView()`) cannot take effect if the canvas is frozen**.
+  - `minimap` - Adds navigation minimap
+  - `mistouchPrevention` - Frozes canvas when clicking outside. **Warning: navigation methods (like `zoomIn()` or `resetView()`) cannot take effect if the canvas is frozen**.
 - `options`: (optional) Array (or space-separated string in case of custom element) of config options:
-    - `controlsHidden` - Hides the control panel
-    - `controlsCollapsed` - Starts with controls collapsed
-    - `proControlSchema` - Uses control keybindings in professional softwares (`mouse wheel`: scroll vertically; `mouse wheel` + `shift`: scroll horizontally; `mouse wheel` + `ctrl`: zoom), rather than mouse wheel to zoom. The canvas viewer automatically detect and adjust control schema by default, but you can explicitly configure it. This option doesn't affect mobile control.
-    - `noPreventionAtStart` (avaliable when mistouchPrevention enabled) Starts without prevention
-    - `minimapCollapsed` - (avaliable when minimap enabled) Starts with minimap collapsed
+  - `controlsHidden` - Hides the control panel
+  - `controlsCollapsed` - Starts with controls collapsed
+  - `proControlSchema` - Uses control keybindings in professional softwares (`mouse wheel`: scroll vertically; `mouse wheel` + `shift`: scroll horizontally; `mouse wheel` + `ctrl`: zoom), rather than mouse wheel to zoom. The canvas viewer automatically detect and adjust control schema by default, but you can explicitly configure it. This option doesn't affect mobile control.
+  - `noShadow` - Disables shadow DOM, DOM elements will be appended to the light DOM directly. The canvas viewer will still be functionable, but the styles may be affected.
+  - `noPreventionAtStart` (avaliable when mistouchPrevention enabled) Starts without prevention
+  - `minimapCollapsed` - (avaliable when minimap enabled) Starts with minimap collapsed
 
 ### Methods
 
@@ -179,7 +180,7 @@ Built with `TypeScript`, `SCSS` and `HTML5 Canvas`.
 
 **Project Structure**:
 
-```
+``` TypeScript
 root
 ├── src/
 │   ├── canvasViewer.ts        // Main class-based component
@@ -197,10 +198,10 @@ root
 ```
 
 **Development Standards**:
+
 - Strict type validation, no non-null assertion operator `!` allowed.
 - Meticulous resource disposal, no memory leak ever possible.
 - Modularized components, avoid monolithic class.
-
 
 ## 📝 Copyright & License
 

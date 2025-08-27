@@ -49,5 +49,4 @@ export default defineConfig({
 	server: {
 		open: '/',
 	},
-	publicDir: resolve(__dirname, 'dist'),
 });
