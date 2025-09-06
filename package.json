@@ -34,7 +34,7 @@
 		"email": "hesprs@outlook.com"
 	},
 	"license": "MIT",
-	"packageManager": "pnpm@10.13.1",
+	"packageManager": "pnpm@10.15.1",
 	"devDependencies": {
 		"@rollup/plugin-terser": "^0.4.4",
 		"@types/node": "^24.2.1",
@@ -61,5 +61,8 @@
 	},
 	"dependencies": {
 		"marked": "^16.1.2"
+	},
+	"optionalDependencies": {
+		"marked-katex-extension": "^5.1.5"
 	}
 }

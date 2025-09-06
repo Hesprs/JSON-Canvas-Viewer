@@ -45,6 +45,10 @@ importers:
       vite:
         specifier: ^7.1.1
         version: 7.1.1(@types/node@24.2.1)(sass@1.90.0)(terser@5.43.1)
+    optionalDependencies:
+      marked-katex-extension:
+        specifier: ^5.1.5
+        version: 5.1.5(katex@0.16.22)(marked@16.1.2)
 
 packages:
 
@@ -610,6 +614,10 @@ packages:
   commander@2.20.3:
     resolution: {integrity: sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==}
 
+  commander@8.3.0:
+    resolution: {integrity: sha512-OkTL9umf+He2DZkUq8f8J9of7yL6RJKI24dVITBmNfZBmri9zYZQrKkuXiKhyfPSu8tUhnVBB1iKXevvnlR4Ww==}
+    engines: {node: '>= 12'}
+
   concat-map@0.0.1:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
 
@@ -814,6 +822,10 @@ packages:
   json-stable-stringify-without-jsonify@1.0.1:
     resolution: {integrity: sha512-Bdboy+l7tA3OGW6FjyFHWkP5LuByj1Tk33Ljyq0axyzdk9//JSi2u3fP1QSmd1KNwq6VOKYGlAu87CisVir6Pw==}
 
+  katex@0.16.22:
+    resolution: {integrity: sha512-XCHRdUw4lf3SKBaJe4EvgqIuWwkPSo9XoeO8GjQW94Bp7TWv9hNhzZjZ+OH9yf1UmLygb7DIT5GSFQiyt16zYg==}
+    hasBin: true
+
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
 
@@ -827,6 +839,12 @@ packages:
 
   lodash.merge@4.6.2:
     resolution: {integrity: sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==}
+
+  marked-katex-extension@5.1.5:
+    resolution: {integrity: sha512-AAlfnpi3ivBWt4Paqb8YW2R7eq2ESJ+AtrgJU1jImUwnxHJAhPkZ5MsR3POnWV9HKwlBLZTVGC5I5+I2xWRiFg==}
+    peerDependencies:
+      katex: '>=0.16 <0.17'
+      marked: '>=4 <17'
 
   marked@16.1.2:
     resolution: {integrity: sha512-rNQt5EvRinalby7zJZu/mB+BvaAY2oz3wCuCjt1RDrWNpS1Pdf9xqMOeC9Hm5adBdcV/3XZPJpG58eT+WBc0XQ==}
@@ -1523,6 +1541,9 @@ snapshots:
 
   commander@2.20.3: {}
 
+  commander@8.3.0:
+    optional: true
+
   concat-map@0.0.1: {}
 
   cross-env@10.0.0:
@@ -1741,6 +1762,11 @@ snapshots:
 
   json-stable-stringify-without-jsonify@1.0.1: {}
 
+  katex@0.16.22:
+    dependencies:
+      commander: 8.3.0
+    optional: true
+
   keyv@4.5.4:
     dependencies:
       json-buffer: 3.0.1
@@ -1755,6 +1781,12 @@ snapshots:
       p-locate: 5.0.0
 
   lodash.merge@4.6.2: {}
+
+  marked-katex-extension@5.1.5(katex@0.16.22)(marked@16.1.2):
+    dependencies:
+      katex: 0.16.22
+      marked: 16.1.2
+    optional: true
 
   marked@16.1.2: {}
 

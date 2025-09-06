@@ -3,7 +3,6 @@
 ![TypeScript](https://badgen.net/badge/-/Strict?icon=typescript&label=TypeScript&labelColor=blue&color=555555)
 [![npm](https://badgen.net/npm/v/json-canvas-viewer?icon=npm&labelColor=red&color=555555)](https://www.npmjs.com/package/json-canvas-viewer)
 [![publish size](https://badgen.net/packagephobia/publish/json-canvas-viewer?labelColor=green&color=555555)](https://packagephobia.now.sh/result?p=json-canvas-viewer)
-[![GitHub commits](https://badgen.net/github/commits/hesprs/JSON-Canvas-Viewer?icon=git&labelColor=purple&color=555555)](https://github.com/hesprs/JSON-Canvas-Viewer/commits/main)
 
 ![Canvas Viewer](example/preview.png)
 
@@ -71,7 +70,7 @@ Or instantiate the viewer (more flexible, but requires more code):
 </script>
 ```
 
-**Tip**: All emited events are realized by `JavaScript CustomEvent`, so the event callback is stored in `event.detail`.
+**Tip**: All emitted events are realized by `JavaScript CustomEvent`, so the event callback is stored in `event.detail`.
 
 If you are coding in TypeScript, and intend to retrieve Custom Event callback, please use the pattern below to make the type validator believe your code is type safe:
 
@@ -114,18 +113,18 @@ new canvasViewer(container, extensions, options);
 - `container`: HTMLElement where the viewer will be rendered
 - `extensions`: (optional) Array (or space-separated string in case of custom element) of extension names to enable:
   - `minimap` - Adds navigation minimap
-  - `mistouchPrevention` - Frozes canvas when clicking outside. **Warning: navigation methods (like `zoomIn()` or `resetView()`) cannot take effect if the canvas is frozen**.
+  - `mistouchPrevention` - Freezes canvas when clicking outside. **Warning: navigation methods (like `zoomIn()` or `resetView()`) cannot take effect if the canvas is frozen**.
 - `options`: (optional) Array (or space-separated string in case of custom element) of config options:
   - `controlsHidden` - Hides the control panel
   - `controlsCollapsed` - Starts with controls collapsed
   - `proControlSchema` - Uses control keybindings in professional softwares (`mouse wheel`: scroll vertically; `mouse wheel` + `shift`: scroll horizontally; `mouse wheel` + `ctrl`: zoom), rather than mouse wheel to zoom. The canvas viewer automatically detect and adjust control schema by default, but you can explicitly configure it. This option doesn't affect mobile control.
-  - `noShadow` - Disables shadow DOM, DOM elements will be appended to the light DOM directly. The canvas viewer will still be functionable, but the styles may be affected.
-  - `noPreventionAtStart` (avaliable when mistouchPrevention enabled) Starts without prevention
-  - `minimapCollapsed` - (avaliable when minimap enabled) Starts with minimap collapsed
+  - `noShadow` - Disables shadow DOM, DOM elements will be appended to the light DOM directly. The canvas viewer will still be functional, but the styles may be affected.
+  - `noPreventionAtStart` (available when mistouchPrevention enabled) Starts without prevention
+  - `minimapCollapsed` - (available when minimap enabled) Starts with minimap collapsed
 
 ### Methods
 
-- `loadCanvas(path)` — Load a canvas file (by path), **please put all the related files (files embeded in the canvas) in the same folder as the canvas file, wherever they originally are**.
+- `loadCanvas(path)` — Load a canvas file (by path), **please put all the related files (files embedded in the canvas) in the same folder as the canvas file, wherever they originally are**.
 - `shiftFullscreen(option)` — Toggle fullscreen mode ('toggle', 'enter', 'exit')
 - `resetView()` — Reset pan/zoom to fit canvas content
 - `zoomIn()` — Zoom in by a fixed step
@@ -202,6 +201,10 @@ root
 - Strict type validation, no non-null assertion operator `!` allowed.
 - Meticulous resource disposal, no memory leak ever possible.
 - Modularized components, avoid monolithic class.
+
+**Extensibility**:
+
+You can extend `Marked` to support more markdown features. Please include `marked` as a dependency, and all [extensions based on Marked](https://marked.js.org/using_pro) are applied equally to the viewer.
 
 ## 📝 Copyright & License
 

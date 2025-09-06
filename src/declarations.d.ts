@@ -9,7 +9,7 @@ declare global {
 		label?: string;
 		background?: string;
 		backgroundStyle?: 'cover' | 'ratio' | 'repeat';
-		styleAttributes?: string;
+		styleAttributes?: Record<string, string>;
 		color?: string;
 		text?: string;
 		file?: string;
@@ -25,7 +25,7 @@ declare global {
 		toSide: 'right' | 'left' | 'top' | 'bottom';
 		toEnd?: 'arrow' | 'none';
 		label?: string;
-		styleAttributes?: string;
+		styleAttributes?: Record<string, string>;
 		color?: string;
 	}
 

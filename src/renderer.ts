@@ -6,7 +6,6 @@ interface viewport {
 }
 
 export interface RuntimeJSONCanvasNode extends JSONCanvasNode {
-	inViewport?: boolean;
 	mdContent?: string;
 	mdFrontmatter?: Record<string, string>;
 }
@@ -31,7 +30,7 @@ export class renderer {
 	private _container: HTMLElement | null;
 	private ARROW_LENGTH: number = 12;
 	private ARROW_WIDTH: number = 7;
-	private FILE_NODE_RADIUS: number = 12;
+	private NODE_RADIUS: number = 12;
 	private FONT_COLOR: string = '#fff';
 	private CSS_ZOOM_REDRAW_INTERVAL: number = 500;
 	private zoomInOptimize: {
@@ -136,7 +135,6 @@ export class renderer {
 		this.ctx.save();
 		this.ctx.translate(offsetX, offsetY);
 		this.ctx.scale(scale, scale);
-		this.canvasData.nodes.forEach(node => (node.inViewport = this.isNodeInViewport(node, offsetX, offsetY, scale)));
 		this.canvasData.nodes.forEach(node => {
 			switch (node.type) {
 				case 'group':
@@ -160,14 +158,6 @@ export class renderer {
 
 	private isViewportInside(inner: viewport, outer: viewport) {
 		return inner.left > outer.left && inner.top > outer.top && inner.right < outer.right && inner.bottom < outer.bottom;
-	}
-
-	private isNodeInViewport(node: JSONCanvasNode, offsetX: number, offsetY: number, scale: number, margin = 200) {
-		const viewLeft = -offsetX / scale - margin;
-		const viewTop = -offsetY / scale - margin;
-		const viewRight = viewLeft + this.container.clientWidth / scale + 2 * margin;
-		const viewBottom = viewTop + this.container.clientHeight / scale + 2 * margin;
-		return node.x + node.width > viewLeft && node.x < viewRight && node.y + node.height > viewTop && node.y < viewBottom;
 	}
 
 	private getCurrentViewport(offsetX: number, offsetY: number, scale: number) {
@@ -210,7 +200,7 @@ export class renderer {
 
 	private drawNodeBackground(node: JSONCanvasNode) {
 		const colors = getColor(node.color);
-		const radius = this.FILE_NODE_RADIUS;
+		const radius = this.NODE_RADIUS;
 		this.ctx.globalAlpha = 1.0;
 		this.ctx.fillStyle = colors.background;
 		drawRoundRect(this.ctx, node.x + 1, node.y + 1, node.width - 2, node.height - 2, radius);
@@ -386,29 +376,43 @@ export function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: numbe
 	ctx.closePath();
 }
 
-export function getColor(colorIndex?: string) {
+export function getColor(colorIndex: string = '0') {
 	let themeColor = null;
-	switch (colorIndex) {
-		case '1':
-			themeColor = 'rgba(255, 120, 129, ?)';
-			break;
-		case '2':
-			themeColor = 'rgba(251, 187, 131, ?)';
-			break;
-		case '3':
-			themeColor = 'rgba(255, 232, 139, ?)';
-			break;
-		case '4':
-			themeColor = 'rgba(124, 211, 124, ?)';
-			break;
-		case '5':
-			themeColor = 'rgba(134, 223, 226, ?)';
-			break;
-		case '6':
-			themeColor = 'rgba(203, 158, 255, ?)';
-			break;
-		default:
-			themeColor = 'rgba(140, 140, 140, ?)';
+
+	function hexToRgb(hex: string) {
+		const cleanHex = hex.replace('#', '');
+		const r = parseInt(cleanHex.substring(0, 2), 16);
+		const g = parseInt(cleanHex.substring(2, 4), 16);
+		const b = parseInt(cleanHex.substring(4, 6), 16);
+		return { r, g, b };
+	}
+
+	if (colorIndex.length === 1) {
+		switch (colorIndex) {
+			case '1':
+				themeColor = 'rgba(255, 120, 129, ?)';
+				break;
+			case '2':
+				themeColor = 'rgba(251, 187, 131, ?)';
+				break;
+			case '3':
+				themeColor = 'rgba(255, 232, 139, ?)';
+				break;
+			case '4':
+				themeColor = 'rgba(124, 211, 124, ?)';
+				break;
+			case '5':
+				themeColor = 'rgba(134, 223, 226, ?)';
+				break;
+			case '6':
+				themeColor = 'rgba(203, 158, 255, ?)';
+				break;
+			default:
+				themeColor = 'rgba(140, 140, 140, ?)';
+		}
+	} else {
+		const rgb = hexToRgb(colorIndex);
+		themeColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ?)`;
 	}
 	return {
 		border: themeColor.replace('?', '0.75'),
