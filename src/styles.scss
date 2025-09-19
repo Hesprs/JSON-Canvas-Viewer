@@ -12,12 +12,7 @@
 	align-items: center;
 }
 
-.overlay-border {
-	z-index: 1;
-}
-
 .container {
-	--themeColor: rgb(254, 247, 167);
 	--contentTransition: color 200ms, opacity 200ms, text-shadow 200ms, fill 200ms;
 	--containerTransition: background 200ms, opacity 200ms, box-shadow 200ms, border 200ms, filter 200ms, backdrop-filter 200ms;
 	color: #fff;
@@ -213,11 +208,13 @@ button {
 	overflow: hidden;
 	user-select: none;
 	contain: strict;
+	content-visibility: auto;
 	&:hover {
 		box-shadow: 0px 2px 12px rgb(0, 0, 0, 0.5);
 	}
 	transition: var(--containerTransition);
 	.overlay-border {
+		z-index: 1;
 		box-sizing: border-box;
 		pointer-events: none;
 		position: absolute;
@@ -464,9 +461,7 @@ ol {
 
 table {
 	border-collapse: collapse;
-	border-spacing: 0;
 	border-radius: 8px;
-	border: 1px solid rgba(255, 255, 255, 0.2);
 	overflow: hidden;
 	width: 100%;
 	th,
