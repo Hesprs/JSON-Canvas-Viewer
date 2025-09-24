@@ -16,7 +16,7 @@ For more about **JSON Canvas**, also known as **Obsidian Canvas**, please visit 
 
 We recommend using your favorite package manager to install the package. **Note: This package requires `marked` as dependency, your package manager will automatically install it.**
 
-``` bash
+```bash
 # npm
 npm install json-canvas-viewer
 
@@ -27,11 +27,11 @@ pnpm add json-canvas-viewer
 yarn add json-canvas-viewer
 ```
 
-The integrated version is a choice if your project *doesn't use Node.js*, which is built with `marked` and `json-canvas-viewer` inlined, so it can be deployed in vanilla JavaScript projects. Find the integrated version in [Release page](https://github.com/hesprs/JSON-Canvas-Viewer/releases).
+The integrated version is a choice if your project _doesn't use Node.js_, which is built with `marked` and `json-canvas-viewer` inlined so that it can be deployed in vanilla JavaScript projects. Find the integrated version in [Release page](https://github.com/hesprs/JSON-Canvas-Viewer/releases).
 
-After installation, you can import the package as a module. It supports both ES module and Common JS, here we take ESM as example:
+After installation, you can import the package as a module. It supports both ES module and CommonJS. JS, here we take ESM as an example:
 
-``` TypeScript
+```TypeScript
 // with Node.js
 import canvasViewer from 'json-canvas-viewer';
 
@@ -43,8 +43,8 @@ import canvasViewer from 'path/to/canvasViewer.js';
 
 As a custom element (a simple way to embed, already defined in the code):
 
-``` HTML
-<canvas-viewer 
+```HTML
+<canvas-viewer
     src="example/introduction.canvas"
     extensions="minimap mistouchPrevention"
     options="minimapCollapsed"
@@ -53,35 +53,35 @@ As a custom element (a simple way to embed, already defined in the code):
 
 Or instantiate the viewer (more flexible, but requires more code):
 
-``` HTML
+```HTML
 <div id="myCanvasContainer" style="width:800px; height:600px;"></div>
 <script>
     const viewer = new canvasViewer(
-        document.getElementById('myCanvasContainer'),
+ document.getElementById('myCanvasContainer'),
         ['minimap', 'mistouchPrevention'],
         ['minimapCollapsed']
     );
-    viewer.loadCanvas('example/introduction.canvas');
-    viewer.addEventListener('interact', e => {
+ viewer.loadCanvas('example/introduction.canvas');
+ viewer.addEventListener('interact', e => {
         // handle node interaction
-    });
+ });
     // dispose when not needed
-    viewer.dispose();
+ viewer.dispose();
 </script>
 ```
 
 **Tip**: All emitted events are realized by `JavaScript CustomEvent`, so the event callback is stored in `event.detail`.
 
-If you are coding in TypeScript, and intend to retrieve Custom Event callback, please use the pattern below to make the type validator believe your code is type safe:
+If you are coding in TypeScript and intend to retrieve a Custom Event callback, please use the pattern below to make the type validator believe your code is type safe:
 
-``` TypeScript
+```TypeScript
 const viewer: canvasViewer = new canvasViewer(...);
 viewer.loadCanvas(...);
 viewer.addEventListener('...', (e: Event) => {
     if (e instanceof CustomEvent) {
         // use e.detail safely here
         console.log(e.detail);
-    };
+ };
 });
 ```
 
@@ -99,14 +99,14 @@ viewer.addEventListener('...', (e: Event) => {
 - Edge connections between nodes with labels
 - Minimap for easy navigation (optional extension)
 - Mistouch prevention (optional extension)
-- Responsive design with mobile and touchpad adaption
-- 🔥 **Much more performant** than rendering canvas in Obsidian!
+- Responsive design with mobile and touchpad adaptation
+- 🔥 **Much more performant** than rendering canvases in Obsidian!
 
 ## 🔌 API Reference
 
 ### Constructor
 
-``` TypeScript
+```TypeScript
 new canvasViewer(container, extensions, options);
 ```
 
@@ -117,10 +117,10 @@ new canvasViewer(container, extensions, options);
 - `options`: (optional) Array (or space-separated string in case of custom element) of config options:
   - `controlsHidden` - Hides the control panel
   - `controlsCollapsed` - Starts with controls collapsed
-  - `proControlSchema` - Uses control keybindings in professional softwares (`mouse wheel`: scroll vertically; `mouse wheel` + `shift`: scroll horizontally; `mouse wheel` + `ctrl`: zoom), rather than mouse wheel to zoom. The canvas viewer automatically detect and adjust control schema by default, but you can explicitly configure it. This option doesn't affect mobile control.
+  - `proControlSchema` - Uses control keybindings in professional software (`mouse wheel`: scroll vertically; `mouse wheel` + `shift`: scroll horizontally; `mouse wheel` + `ctrl`: zoom), rather than zooming with the mouse wheel. The canvas viewer automatically detects and adjusts the control schema by default, but you can explicitly configure it. This option doesn't affect mobile control.
   - `noShadow` - Disables shadow DOM, DOM elements will be appended to the light DOM directly. The canvas viewer will still be functional, but the styles may be affected.
-  - `noPreventionAtStart` (available when mistouchPrevention enabled) Starts without prevention
-  - `minimapCollapsed` - (available when minimap enabled) Starts with minimap collapsed
+  - `noPreventionAtStart` (available when mistouchPrevention is enabled) Starts without prevention
+  - `minimapCollapsed` - (available when minimap is enabled) Starts with minimap collapsed
 
 ### Methods
 
@@ -144,7 +144,7 @@ Register with `viewer.addEventListener(event, callback)`.
 
 The viewer expects JSON Canvas files in JSON format:
 
-``` JSON
+```JSON
 {
     "nodes": [
         {
@@ -179,7 +179,7 @@ Built with `TypeScript`, `SCSS` and `HTML5 Canvas`.
 
 **Project Structure**:
 
-``` TypeScript
+```bash
 root
 ├── src/
 │   ├── canvasViewer.ts        // Main class-based component
@@ -193,14 +193,14 @@ root
 │   ├── declarations.d.ts      // Public types
 │   └── styles.scss            // Styles for the viewer
 └── example/
-    └── index.html             // Example/test entry point
+ └── index.html                // Example/test entry point
 ```
 
 **Development Standards**:
 
 - Strict type validation, no non-null assertion operator `!` allowed.
 - Meticulous resource disposal, no memory leak ever possible.
-- Modularized components, avoid monolithic class.
+- Modularized components, avoid monolithic classes.
 
 **Extensibility**:
 

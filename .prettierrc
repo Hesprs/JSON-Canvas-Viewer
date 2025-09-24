@@ -8,5 +8,14 @@
 	"bracketSpacing": true,
 	"bracketSameLine": true,
 	"endOfLine": "lf",
-	"printWidth": 800
+	"printWidth": 800,
+	"overrides": [
+    	{
+			"files": "*.md",
+			"options": {
+				"tabWidth": 2,
+				"useTabs": false
+			}
+		}
+	]
 }
