@@ -1,36 +1,36 @@
 import { marked } from 'marked';
-import { RuntimeJSONCanvasNode, unexpectedError, destroyError, getColor } from './renderer';
+import { RuntimeJSONCanvasNode, unexpectedError, destroyError, getColor } from './utilities';
 
-export default class overlayManager extends EventTarget {
+export default class overlayManager {
 	private _overlaysLayer: HTMLDivElement | null;
-	private _overlays: Record<string, HTMLDivElement> | null;
-	private _canvasBaseDir: string | null = null;
+	private overlays: Record<string, HTMLDivElement> = {}; // { id: node } the overlays in viewport
 	private selectedId: string | null = null;
 	private eventListeners: Record<string, Array<EventListener | null>> = {};
+	private data: runtimeData;
+	private registry: registry;
 
-	private get canvasBaseDir() {
-		if (!this._canvasBaseDir) throw destroyError;
-		return this._canvasBaseDir;
-	}
-	private get overlays() {
-		if (!this._overlays) throw destroyError;
-		return this._overlays;
-	}
 	private get overlaysLayer() {
 		if (!this._overlaysLayer) throw destroyError;
 		return this._overlaysLayer;
 	}
 
-	constructor(container: HTMLElement) {
-		super();
+	constructor(data: runtimeData, registry: registry) {
+		registry.register({
+			hooks: {
+				onLoaded: [this.onLoaded],
+				onDispose: [this.dispose],
+				onRender: [this.updateOverlays],
+				onClick: [(id: string | null) => this.select(id)],
+			},
+		});
 		this._overlaysLayer = document.createElement('div');
 		this._overlaysLayer.className = 'overlays';
-		container.appendChild(this.overlaysLayer);
-		this._overlays = {}; // { id: node } the overlays in viewport
+		data.container.appendChild(this.overlaysLayer);
+		this.data = data;
+		this.registry = registry;
 	}
 
-	receiveData(canvasBaseDir: string, nodeMap: Record<string, JSONCanvasNode>) {
-		this._canvasBaseDir = canvasBaseDir;
+	private onLoaded = () => {
 		const overlayCreators = {
 			text: (node: RuntimeJSONCanvasNode) => {
 				if (!node.text) throw unexpectedError;
@@ -39,7 +39,8 @@ export default class overlayManager extends EventTarget {
 			file: (node: RuntimeJSONCanvasNode) => {
 				if (!node.file) throw unexpectedError;
 				if (node.file.match(/\.md$/i)) this.loadMarkdownForNode(node);
-				else if (node.file.match(/\.(png|jpg|jpeg|gif|svg)$/i)) this.updateOrCreateOverlay(node, this.canvasBaseDir + node.file, 'image');
+				else if (node.file.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i)) this.updateOrCreateOverlay(node, this.data.canvasBaseDir + node.file, 'image');
+				else if (node.file.match(/\.(mp3|wav)$/i)) this.updateOrCreateOverlay(node, this.data.canvasBaseDir + node.file, 'audio');
 			},
 			link: (node: RuntimeJSONCanvasNode) => {
 				if (!node.url) throw unexpectedError;
@@ -47,10 +48,10 @@ export default class overlayManager extends EventTarget {
 			},
 			group: () => {},
 		};
-		Object.values(nodeMap).forEach(node => overlayCreators[node.type](node));
-	}
+		Object.values(this.data.nodeMap).forEach(node => overlayCreators[node.type](node));
+	};
 
-	select(id: string | null) {
+	private select(id: string | null) {
 		const previous = !this.selectedId ? null : this.overlays[this.selectedId];
 		const current = !id ? null : this.overlays[id];
 		if (previous) previous.classList.remove('active');
@@ -67,7 +68,7 @@ export default class overlayManager extends EventTarget {
 			this.updateOrCreateOverlay(node, node.mdContent, 'markdown');
 			try {
 				if (!node.file) throw unexpectedError;
-				const response = await fetch(this.canvasBaseDir + node.file);
+				const response = await fetch(this.data.canvasBaseDir + node.file);
 				const result = await response.text();
 				const frontmatterMatch = result.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
 				if (frontmatterMatch) {
@@ -78,9 +79,7 @@ export default class overlayManager extends EventTarget {
 					}, {});
 					node.mdContent = await marked.parse(frontmatterMatch[2].trim());
 					node.mdFrontmatter = frontmatter;
-				} else {
-					node.mdContent = await marked.parse(result);
-				}
+				} else node.mdContent = await marked.parse(result);
 			} catch (err) {
 				console.error('Failed to load markdown:', err);
 				node.mdContent = 'Failed to load content.';
@@ -89,9 +88,7 @@ export default class overlayManager extends EventTarget {
 		this.updateOrCreateOverlay(node, node.mdContent, 'markdown');
 	}
 
-	updateAllOverlays(offsetX: number, offsetY: number, scale: number) {
-		this.overlaysLayer.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
-	}
+	private updateOverlays = () => (this.overlaysLayer.style.transform = `translate(${this.data.offsetX}px, ${this.data.offsetY}px) scale(${this.data.scale})`);
 
 	private async updateOrCreateOverlay(node: RuntimeJSONCanvasNode, content: string, type: string) {
 		let element = this.overlays[node.id];
@@ -114,17 +111,12 @@ export default class overlayManager extends EventTarget {
 	}
 
 	private async constructOverlay(node: RuntimeJSONCanvasNode, content: string, type: string) {
-		const colorClass = node.color == undefined ? '0' : node.color;
-		const color = getColor(colorClass);
+		const color = getColor(node.color);
 		const overlay = document.createElement('div');
 		overlay.classList.add('overlay-container');
 		overlay.id = node.id;
 		overlay.style.backgroundColor = color.background;
 		overlay.style.setProperty('--active-color', color.active);
-		const overlayBorder = document.createElement('div');
-		overlayBorder.className = 'overlay-border';
-		overlayBorder.style.borderColor = color.border;
-		overlay.appendChild(overlayBorder);
 		switch (type) {
 			case 'text':
 			case 'markdown':
@@ -140,40 +132,54 @@ export default class overlayManager extends EventTarget {
 				iframe.sandbox = 'allow-scripts allow-same-origin';
 				iframe.className = 'link-iframe';
 				iframe.loading = 'lazy';
-				const clickLayer = document.createElement('div');
-				clickLayer.className = 'link-click-layer';
 				overlay.appendChild(iframe);
-				overlay.appendChild(clickLayer);
+				break;
+			case 'audio':
+				const audio = document.createElement('audio');
+				audio.className = 'audio';
+				audio.src = content;
+				audio.controls = true;
+				overlay.appendChild(audio);
 				break;
 			case 'image':
 				const img = document.createElement('img');
 				img.src = content;
 				img.loading = 'lazy';
 				overlay.appendChild(img);
-				break;
 		}
-		if (type !== 'image') {
-			if (this.selectedId === node.id) overlay.classList.add('active');
-			const onStart = () => {
-				if (node.id === this.selectedId) this.startInteract();
-			};
-			const onEnd = () => {
-				if (node.id === this.selectedId) this.endInteract();
-			};
-			overlay.addEventListener('pointerenter', onStart);
-			overlay.addEventListener('pointerleave', onEnd);
-			overlay.addEventListener('touchstart', onStart);
-			overlay.addEventListener('touchend', onEnd);
-			this.eventListeners[node.id] = [onStart, onEnd];
+		switch (type) {
+			case 'link':
+			case 'audio':
+				const clickLayer = document.createElement('div');
+				clickLayer.className = 'click-layer';
+				overlay.appendChild(clickLayer);
 		}
+		const overlayBorder = document.createElement('div');
+		overlayBorder.className = 'overlay-border';
+		overlayBorder.style.borderColor = color.border;
+		overlay.appendChild(overlayBorder);
+		const onStart = () => {
+			if (node.id === this.selectedId) this.startInteract();
+		};
+		const onEnd = () => {
+			if (node.id === this.selectedId) this.endInteract();
+		};
+		overlay.addEventListener('pointerenter', onStart);
+		overlay.addEventListener('pointerleave', onEnd);
+		overlay.addEventListener('touchstart', onStart);
+		overlay.addEventListener('touchend', onEnd);
+		this.eventListeners[node.id] = [onStart, onEnd];
 		return overlay;
 	}
 
-	private startInteract = () => this.dispatchEvent(new CustomEvent('interactionStart'));
-	private endInteract = () => this.dispatchEvent(new CustomEvent('interactionEnd'));
+	private startInteract() {
+		for (const hook of this.registry.hooks.onInteractionStart) hook();
+	}
+	private endInteract() {
+		for (const hook of this.registry.hooks.onInteractionEnd) hook();
+	}
 
-	dispose() {
-		this._overlays = null;
+	private dispose = () => {
 		while (this.overlaysLayer.firstElementChild) {
 			const child = this.overlaysLayer.firstElementChild;
 			if (this.eventListeners[child.id]) {
@@ -191,5 +197,5 @@ export default class overlayManager extends EventTarget {
 		}
 		this.overlaysLayer.remove();
 		this._overlaysLayer = null;
-	}
+	};
 }

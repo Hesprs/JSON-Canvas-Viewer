@@ -214,7 +214,6 @@ button {
 	}
 	transition: var(--containerTransition);
 	.overlay-border {
-		z-index: 1;
 		box-sizing: border-box;
 		pointer-events: none;
 		position: absolute;
@@ -252,78 +251,19 @@ button {
 	}
 }
 
-.link-iframe {
-	contain-intrinsic-size: 100% 100%;
+.link-iframe, .audio {
 	@extend .full;
 	border: none;
+	background: transparent;
 }
 
-.link-click-layer {
+.click-layer {
 	@extend .full;
 	background: transparent;
 	pointer-events: auto;
 	.active & {
 		pointer-events: none;
 	}
-}
-
-.preview-modal-backdrop {
-	@extend .full;
-	backdrop-filter: blur(8px) saturate(1.5);
-	transition: var(--containerTransition);
-	&.hidden {
-		pointer-events: none;
-	}
-}
-
-.preview-modal {
-	@extend .full;
-	transition: var(--containerTransition);
-	pointer-events: none;
-}
-
-.preview-modal-close {
-	position: absolute;
-	right: 10px;
-	top: 10px;
-	background: none;
-	border: none;
-	font-size: 24px;
-	cursor: pointer;
-	pointer-events: none;
-	.preview-modal:not(.hidden) & {
-		pointer-events: auto;
-	}
-}
-
-.preview-modal-content {
-	position: absolute;
-	top: 50%;
-	left: 50%;
-	transform: translate(-50%, -50%);
-	width: fit-content;
-	height: fit-content;
-	pointer-events: none;
-	.preview-modal:not(.hidden) & {
-		pointer-events: auto;
-	}
-	& > * {
-		max-width: var(--preview-max-width);
-		max-height: var(--preview-max-height);
-		border: 2px solid rgba(162, 162, 162, 0.5);
-		box-shadow: 0px 2px 6px rgb(0, 0, 0, 0.3);
-		box-sizing: border-box;
-	}
-	& > img {
-		border-radius: 12px;
-	}
-	& > audio {
-		border-radius: 27px;
-	}
-}
-
-.hidden {
-	opacity: 0;
 }
 
 .katex-html {

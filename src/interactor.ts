@@ -1,7 +1,7 @@
-import { unexpectedError, destroyError } from './renderer';
+import { unexpectedError } from './utilities';
 
 export default class interactor extends EventTarget {
-	private _monitoringElement: HTMLElement | null;
+	private monitoringElement: HTMLElement;
 	private pointers: Map<
 		number,
 		{
@@ -18,24 +18,14 @@ export default class interactor extends EventTarget {
 		lastMidpoint: { x: number; y: number };
 	};
 	private proControlSchema: boolean;
-	private panDump: Coordinates;
-	private zoomDump: {
-		factor: number;
-		origin: Coordinates;
-	};
 	private zoomFactor: number;
 	private preventDefault: boolean;
 	private lockControlSchema: boolean;
 	private ctrlZoomFactor: number;
 
-	private get monitoringElement() {
-		if (this._monitoringElement === null) throw destroyError;
-		return this._monitoringElement;
-	}
-
 	constructor(monitoringElement: HTMLElement, options?: { preventDefault?: boolean; proControlSchema?: boolean; zoomFactor?: number; lockControlSchema?: boolean }) {
 		super();
-		this._monitoringElement = monitoringElement;
+		this.monitoringElement = monitoringElement;
 		const option = options || {};
 		this.preventDefault = option.preventDefault || false;
 		this.proControlSchema = option.proControlSchema || false;
@@ -46,11 +36,6 @@ export default class interactor extends EventTarget {
 		this.pinchZoomState = {
 			lastDistance: 0,
 			lastMidpoint: { x: 0, y: 0 },
-		};
-		this.panDump = { x: 0, y: 0 };
-		this.zoomDump = {
-			factor: 1,
-			origin: { x: 0, y: 0 },
 		};
 	}
 
@@ -180,16 +165,12 @@ export default class interactor extends EventTarget {
 			x: this.round(diff.x, 1),
 			y: this.round(diff.y, 1),
 		};
-		this.panDump.x += roundedDiff.x;
-		this.panDump.y += roundedDiff.y;
 		const panEvent = new CustomEvent<Coordinates>('pan', { detail: roundedDiff });
 		this.dispatchEvent(panEvent);
 	}
 
 	private dispatchZoomEvent(factor: number, origin: Coordinates) {
 		const roundedFactor = this.round(factor, 4);
-		this.zoomDump.factor *= roundedFactor;
-		this.zoomDump.origin = origin;
 		const zoomEvent = new CustomEvent<{ factor: number; origin: Coordinates }>('zoom', { detail: { factor: roundedFactor, origin: origin } });
 		this.dispatchEvent(zoomEvent);
 	}
@@ -201,23 +182,7 @@ export default class interactor extends EventTarget {
 		return Math.round(roundedNum * factor) / factor;
 	}
 
-	getZoomDump() {
-		return this.zoomDump;
-	}
-
-	resetZoomDump() {
-		this.zoomDump.factor = 1;
-	}
-
-	getPanDump() {
-		return this.panDump;
-	}
-
-	resetPanDump() {
-		this.panDump = { x: 0, y: 0 };
-	}
-
-	stop() {
+	stop = () => {
 		this.monitoringElement.removeEventListener('pointerdown', this.onPointerDown);
 		window.removeEventListener('pointermove', this.onPointerMove);
 		window.removeEventListener('pointerup', this.onPointerUp);
@@ -229,7 +194,7 @@ export default class interactor extends EventTarget {
 		}
 	}
 
-	start() {
+	start = () => {
 		this.monitoringElement.addEventListener('pointerdown', this.onPointerDown);
 		window.addEventListener('pointermove', this.onPointerMove);
 		window.addEventListener('pointerup', this.onPointerUp);
@@ -241,9 +206,5 @@ export default class interactor extends EventTarget {
 		}
 	}
 
-	dispose() {
-		this.stop();
-		this.pointers.clear();
-		this._monitoringElement = null;
-	}
+	dispose = () => this.stop();
 }

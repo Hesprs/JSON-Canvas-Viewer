@@ -24,15 +24,23 @@
 	<!-- <canvas-viewer src="Example Canvas/introduction.canvas" extensions="minimap mistouchPrevention" options="noPreventionAtStart"></canvas-viewer> -->
 </body>
 <script type="module">
-	import canvasViewer from 'json-canvas-viewer';
+	import canvasViewer from '@/canvasViewer.ts';
+	import minimap from '@/extensions/minimap.ts';
+	import controls from '@/extensions/controls.ts';
 	import katex from 'marked-katex-extension';
 	import { marked } from 'marked';
 	marked.use(katex());
-	const viewer = new canvasViewer(
-		document.body,
-		['minimap'],
-		['minimapCollapsed', 'noPreventionAtStart']
-	);
+	const viewer = new canvasViewer(document.body, {
+		extensions: [minimap, controls],
+		options: {
+			minimap: {
+				collapsed: true,
+			},
+			controls: {
+				collapsed: true,
+			},
+		},
+	});
 	viewer.loadCanvas('Example Canvas/introduction.canvas');
 </script>
 </html>

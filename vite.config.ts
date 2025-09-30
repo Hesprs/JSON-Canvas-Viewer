@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import terser from '@rollup/plugin-terser';
@@ -6,30 +7,29 @@ const standalone = process.env.standalone === 'true';
 const external = standalone ? [] : ['marked'];
 const output = standalone
 	? [
-		{
-			format: 'es',
-			entryFileNames: `canvasViewer.js`,
-			plugins: [terser()],
-		},
-	]
+			{
+				format: 'es',
+				entryFileNames: `canvasViewer.js`,
+				plugins: [terser()],
+			},
+	  ]
 	: [
-		{
-			format: 'es',
-			entryFileNames: `canvasViewer.esm.js`,
-			plugins: [terser()],
-		},
-		{
-			format: 'cjs',
-			entryFileNames: `canvasViewer.cjs.js`,
-		},
-	]
-;
+			{
+				format: 'es',
+				entryFileNames: `canvasViewer.esm.js`,
+				plugins: [terser()],
+			},
+			{
+				format: 'cjs',
+				entryFileNames: `canvasViewer.cjs.js`,
+			},
+	  ];
 
 export default defineConfig({
 	root: resolve(__dirname, 'example'),
 	resolve: {
 		alias: {
-			'json-canvas-viewer': resolve(__dirname, 'src/canvasViewer.ts'),
+			'@': resolve(__dirname, 'src/'),
 		},
 	},
 	build: {

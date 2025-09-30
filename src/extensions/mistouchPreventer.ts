@@ -1,30 +1,34 @@
-import { destroyError } from './renderer';
+import { destroyError } from '../utilities';
 
-export default class mistouchPreventer extends EventTarget {
-	private _container: HTMLElement | null;
+export default class mistouchPreventer {
 	private _preventionContainer: HTMLDivElement | null;
 	private preventMt: boolean = false;
 	private preventMistouch: { record: boolean; lastX: number; lastY: number; initialX: number; initialY: number };
+	private data: runtimeData;
 
 	private get preventionContainer() {
 		if (this._preventionContainer === null) throw destroyError;
 		return this._preventionContainer;
 	}
-	private get container() {
-		if (this._container === null) throw destroyError;
-		return this._container;
-	}
 
-	constructor(container: HTMLElement, prevent: boolean = true) {
-		super();
+	constructor(data: runtimeData, registry: registry) {
+		registry.register({
+			hooks: {
+				onDispose: [this.dispose],
+			},
+			options: {
+				mistouchPreventer: {
+					preventAtStart: true,
+				},
+			},
+		});
 		this._preventionContainer = document.createElement('div');
 		this._preventionContainer.className = 'prevention-container hidden';
 		const preventionBanner = document.createElement('div');
 		preventionBanner.className = 'prevention-banner';
 		preventionBanner.innerHTML = 'Frozen to prevent mistouch, click on to unlock.';
 		this._preventionContainer.appendChild(preventionBanner);
-		container.appendChild(this._preventionContainer);
-		this._container = container;
+		data.container.appendChild(this._preventionContainer);
 		this.preventMistouch = {
 			record: false,
 			lastX: 0,
@@ -33,7 +37,8 @@ export default class mistouchPreventer extends EventTarget {
 			initialY: 0,
 		};
 
-		if (prevent) this.startPrevention();
+		if (registry.options.mistouchPreventer.preventAtStart) this.startPrevention();
+		this.data = data;
 
 		window.addEventListener('pointerdown', this.onPointerDown);
 		window.addEventListener('pointermove', this.onPointerMove);
@@ -41,7 +46,7 @@ export default class mistouchPreventer extends EventTarget {
 	}
 
 	private onPointerDown = (e: PointerEvent) => {
-		const bounds = this.container.getBoundingClientRect();
+		const bounds = this.data.container.getBoundingClientRect();
 		if (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom) {
 			if (!this.preventMt) this.startPrevention();
 		} else if (this.preventMt) {
@@ -69,16 +74,14 @@ export default class mistouchPreventer extends EventTarget {
 
 	startPrevention() {
 		this.preventionContainer.classList.remove('hidden');
-		this.container.classList.add('numb');
+		this.data.container.classList.add('numb');
 		this.preventMt = true;
-		this.dispatchEvent(new CustomEvent('preventionStart'));
 	}
 
 	endPrevention() {
 		this.preventMt = false;
 		this.preventionContainer.classList.add('hidden');
-		setTimeout(() => this.container.classList.remove('numb'), 50); // minimum delay to prevent triggering undesired button touch
-		this.dispatchEvent(new CustomEvent('preventionEnd'));
+		setTimeout(() => this.data.container.classList.remove('numb'), 50); // minimum delay to prevent triggering undesired button touch
 	}
 
 	dispose() {
@@ -86,7 +89,6 @@ export default class mistouchPreventer extends EventTarget {
 		window.removeEventListener('pointermove', this.onPointerMove);
 		window.removeEventListener('pointerup', this.onPointerUp);
 		this.preventionContainer.remove();
-		this._container = null;
 		this._preventionContainer = null;
 	}
 }

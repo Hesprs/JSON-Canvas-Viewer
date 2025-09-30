@@ -1,6 +1,6 @@
-import { destroyError } from './renderer';
+import { destroyError } from '../utilities';
 
-export default class controls extends EventTarget {
+export default class controls {
 	private _controlsPanel: HTMLDivElement | null;
 	private _toggleCollapseBtn: HTMLButtonElement | null;
 	private _toggleFullscreenBtn: HTMLButtonElement | null;
@@ -8,6 +8,7 @@ export default class controls extends EventTarget {
 	private _zoomSlider: HTMLInputElement | null;
 	private _zoomInBtn: HTMLButtonElement | null;
 	private _resetViewBtn: HTMLButtonElement | null;
+	private registry: registry;
 
 	private get controlsPanel() {
 		if (this._controlsPanel === null) throw destroyError;
@@ -38,11 +39,23 @@ export default class controls extends EventTarget {
 		return this._resetViewBtn;
 	}
 
-	constructor(container: HTMLElement, controlsCollapsed: boolean = false) {
-		super();
+	constructor(data: runtimeData, registry: registry) {
+		registry.register({
+			hooks: {
+				onToggleFullscreen: [this.updateFullscreenBtn],
+				onZoom: [this.updateSlider],
+				onLoaded: [() => this.updateSlider(data.scale)],
+			},
+			options: {
+				controls: {
+					collapsed: false,
+				},
+			},
+		});
+
 		this._controlsPanel = document.createElement('div');
 		this._controlsPanel.className = 'controls';
-		this._controlsPanel.classList.toggle('collapsed', controlsCollapsed);
+		this._controlsPanel.classList.toggle('collapsed', registry.options.controls.collapsed);
 
 		this._toggleCollapseBtn = document.createElement('button');
 		this._toggleCollapseBtn.className = 'collapse-button';
@@ -78,29 +91,31 @@ export default class controls extends EventTarget {
 
 		this._controlsPanel.appendChild(controlsContent);
 
-		container.appendChild(this._controlsPanel);
+		data.container.appendChild(this._controlsPanel);
 
 		this._toggleCollapseBtn.addEventListener('click', this.toggleCollapse);
 		this._zoomInBtn.addEventListener('click', this.zoomIn);
 		this._zoomOutBtn.addEventListener('click', this.zoomOut);
 		this._zoomSlider.addEventListener('input', this.slide);
 		this._resetViewBtn.addEventListener('click', this.resetView);
-		this._toggleFullscreenBtn.addEventListener('click', this.toggleFullscreen);
+		this._toggleFullscreenBtn.addEventListener('click', this.onToggleFullscreen);
+
+		this.registry = registry;
 	}
 
 	private toggleCollapse = () => this.controlsPanel.classList.toggle('collapsed');
-	private zoomIn = () => this.dispatchEvent(new CustomEvent('zoomIn'));
-	private zoomOut = () => this.dispatchEvent(new CustomEvent('zoomOut'));
-	private slide = () => this.dispatchEvent(new CustomEvent<number>('slide', { detail: Math.pow(1.1, Number(this.zoomSlider.value)) }));
-	private resetView = () => this.dispatchEvent(new CustomEvent('resetView'));
-	private toggleFullscreen = () => this.dispatchEvent(new CustomEvent('toggleFullscreen'));
+	private zoomIn = () => this.registry.api.main.zoom(1.1, this.registry.api.main.middleScreen());
+	private zoomOut = () => this.registry.api.main.zoom(1 / 1.1, this.registry.api.main.middleScreen());
+	private slide = () => this.registry.api.main.zoomToScale(Math.pow(1.1, Number(this.zoomSlider.value)), this.registry.api.main.middleScreen());
+	private resetView = () => this.registry.api.main.resetView();
+	private onToggleFullscreen = () => this.registry.api.main.shiftFullscreen();
 
-	updateFullscreenBtn() {
+	private updateFullscreenBtn() {
 		if (document.fullscreenElement === null) this.toggleFullscreenBtn.innerHTML = `<svg viewBox="-40.32 -40.32 176.64 176.64"><path d="M30 60H6a6 6 0 0 0 0 12h18v18a6 6 0 0 0 12 0V66a5.997 5.997 0 0 0-6-6Zm60 0H66a5.997 5.997 0 0 0-6 6v24a6 6 0 0 0 12 0V72h18a6 6 0 0 0 0-12ZM66 36h24a6 6 0 0 0 0-12H72V6a6 6 0 0 0-12 0v24a5.997 5.997 0 0 0 6 6ZM30 0a5.997 5.997 0 0 0-6 6v18H6a6 6 0 0 0 0 12h24a5.997 5.997 0 0 0 6-6V6a5.997 5.997 0 0 0-6-6Z"/></svg>`;
 		else this.toggleFullscreenBtn.innerHTML = `<svg viewBox="-5.28 -5.28 34.56 34.56" fill="none"><path d="M4 9V5.6c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 4 5.04 4 5.6 4H9M4 15v3.4c0 .56 0 .84.109 1.054a1 1 0 0 0 .437.437C4.76 20 5.04 20 5.6 20H9m6-16h3.4c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C20 4.76 20 5.04 20 5.6V9m0 6v3.4c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437C19.24 20 18.96 20 18.4 20H15" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 	}
 
-	updateSlider = (scale: number) => (this.zoomSlider.value = String(this.scaleToSlider(scale)));
+	private updateSlider = (scale: number) => (this.zoomSlider.value = String(this.scaleToSlider(scale)));
 	private scaleToSlider = (scale: number) => Math.log(scale) / Math.log(1.1);
 
 	dispose() {
@@ -109,7 +124,7 @@ export default class controls extends EventTarget {
 		this.zoomOutBtn.removeEventListener('click', this.zoomOut);
 		this.zoomSlider.removeEventListener('input', this.slide);
 		this.resetViewBtn.removeEventListener('click', this.resetView);
-		this.toggleFullscreenBtn.removeEventListener('click', this.toggleFullscreen);
+		this.toggleFullscreenBtn.removeEventListener('click', this.onToggleFullscreen);
 		this.controlsPanel.remove();
 		this._controlsPanel = null;
 		this._toggleCollapseBtn = null;

@@ -1,50 +1,18 @@
-import { getColor, drawRoundRect, getAnchorCoord, destroyError, resizeCanvasForDPR } from './renderer';
+import { getColor, drawRoundRect, getAnchorCoord, destroyError, resizeCanvasForDPR } from '../utilities';
 
-export default class minimap extends EventTarget {
-	private _minimapCtx: CanvasRenderingContext2D | null;
-	private _canvasData: JSONCanvas | null = null;
-	private _nodeMap: Record<string, JSONCanvasNode> | null = null;
-	private _nodeBounds: {
-		minX: number;
-		minY: number;
-		maxX: number;
-		maxY: number;
-		width: number;
-		height: number;
-		centerX: number;
-		centerY: number;
-	} | null = null;
+export default class minimap {
+	private minimapCtx: CanvasRenderingContext2D;
 	private _viewportRectangle: HTMLDivElement | null;
 	private _minimap: HTMLDivElement | null;
-	private _container: HTMLElement | null;
 	private _minimapContainer: HTMLDivElement | null;
 	private _toggleMinimapBtn: HTMLButtonElement | null;
-	private isMinimapVisible: boolean;
+	private minimapCollapsed: boolean;
 	private minimapCache: { scale: number; centerX: number; centerY: number };
+	private data: runtimeData;
 
-	private get minimapCtx() {
-		if (this._minimapCtx === null) throw destroyError;
-		return this._minimapCtx;
-	}
-	private get canvasData() {
-		if (this._canvasData === null) throw destroyError;
-		return this._canvasData;
-	}
-	private get container() {
-		if (this._container === null) throw destroyError;
-		return this._container;
-	}
 	private get minimap() {
 		if (this._minimap === null) throw destroyError;
 		return this._minimap;
-	}
-	private get nodeBounds() {
-		if (this._nodeBounds === null) throw destroyError;
-		return this._nodeBounds;
-	}
-	private get nodeMap() {
-		if (this._nodeMap === null) throw destroyError;
-		return this._nodeMap;
 	}
 	private get viewportRectangle() {
 		if (this._viewportRectangle === null) throw destroyError;
@@ -59,8 +27,20 @@ export default class minimap extends EventTarget {
 		return this._toggleMinimapBtn;
 	}
 
-	constructor(container: HTMLElement, minimapCollapsed: boolean = false) {
-		super();
+	constructor(data: runtimeData, registry: registry) {
+		registry.register({
+			hooks: {
+				onLoaded: [this.drawMinimap],
+				onRender: [this.updateViewportRectangle],
+				onDispose: [this.dispose],
+			},
+			options: {
+				minimap: {
+					collapsed: false,
+				},
+			},
+		});
+
 		this._minimapContainer = document.createElement('div');
 		this._minimapContainer.className = 'minimap-container';
 
@@ -77,42 +57,34 @@ export default class minimap extends EventTarget {
 		minimapCanvas.height = 150;
 
 		this._minimap.appendChild(minimapCanvas);
-		this._minimapCtx = minimapCanvas.getContext('2d');
+		this.minimapCtx = minimapCanvas.getContext('2d') as CanvasRenderingContext2D;
 		this._viewportRectangle = document.createElement('div');
 		this._viewportRectangle.className = 'viewport-rectangle';
 		this._minimap.appendChild(this._viewportRectangle);
 		this._minimapContainer.appendChild(this._minimap);
 
-		container.appendChild(this._minimapContainer);
-		this._container = container;
+		data.container.appendChild(this._minimapContainer);
+		this.data = data;
 
-		this.isMinimapVisible = !minimapCollapsed;
-		this._minimapContainer.classList.toggle('collapsed', minimapCollapsed);
+		this.minimapCollapsed = registry.options.minimap.collapsed;
+		this._minimapContainer.classList.toggle('collapsed', this.minimapCollapsed);
 		this.minimapCache = {
 			scale: 1,
 			centerX: 0,
 			centerY: 0,
 		};
-		this._toggleMinimapBtn.addEventListener('click', this.toggleVisisbility);
-
+		this._toggleMinimapBtn.addEventListener('click', this.toggleVisibility);
 		resizeCanvasForDPR(minimapCanvas, minimapCanvas.width, minimapCanvas.height);
 	}
 
-	receiveData(nodeBounds: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number; centerX: number; centerY: number }, canvasData: JSONCanvas, nodeMap: Record<string, JSONCanvasNode>) {
-		this._nodeBounds = nodeBounds;
-		this._canvasData = canvasData;
-		this._nodeMap = nodeMap;
-		this.drawMinimap();
-	}
-
-	private toggleVisisbility = () => {
-		this.isMinimapVisible = !this.isMinimapVisible;
+	private toggleVisibility = () => {
+		this.minimapCollapsed = !this.minimapCollapsed;
 		this.minimapContainer.classList.toggle('collapsed');
-		this.dispatchEvent(new CustomEvent<string>(this.isMinimapVisible ? 'minimapExpanded' : 'minimapCollapsed'));
+		if (!this.minimapCollapsed) this.updateViewportRectangle();
 	};
 
-	private drawMinimap() {
-		const bounds = this.nodeBounds;
+	private drawMinimap = () => {
+		const bounds = this.data.nodeBounds;
 		if (!bounds) return;
 		const displayWidth = this.minimap.clientWidth;
 		const displayHeight = this.minimap.clientHeight;
@@ -126,10 +98,10 @@ export default class minimap extends EventTarget {
 		this.minimapCtx.translate(this.minimapCache.centerX, this.minimapCache.centerY);
 		this.minimapCtx.scale(this.minimapCache.scale, this.minimapCache.scale);
 		this.minimapCtx.translate(-bounds.centerX, -bounds.centerY);
-		for (let edge of this.canvasData.edges) this.drawMinimapEdge(edge);
-		for (let node of this.canvasData.nodes) this.drawMinimapNode(node);
+		for (let edge of this.data.canvasData.edges) this.drawMinimapEdge(edge);
+		for (let node of this.data.canvasData.nodes) this.drawMinimapNode(node);
 		this.minimapCtx.restore();
-	}
+	};
 
 	private drawMinimapNode(node: JSONCanvasNode) {
 		const colors = getColor(node.color);
@@ -142,8 +114,8 @@ export default class minimap extends EventTarget {
 	}
 
 	private drawMinimapEdge(edge: JSONCanvasEdge) {
-		const fromNode = this.nodeMap[edge.fromNode];
-		const toNode = this.nodeMap[edge.toNode];
+		const fromNode = this.data.nodeMap[edge.fromNode];
+		const toNode = this.data.nodeMap[edge.toNode];
 		if (!fromNode || !toNode) return;
 		const [startX, startY] = getAnchorCoord(fromNode, edge.fromSide);
 		const [endX, endY] = getAnchorCoord(toNode, edge.toSide);
@@ -155,14 +127,14 @@ export default class minimap extends EventTarget {
 		this.minimapCtx.stroke();
 	}
 
-	updateViewportRectangle(offsetX: number, offsetY: number, scale: number) {
-		if (!this.isMinimapVisible) return;
-		const bounds = this.nodeBounds;
+	private updateViewportRectangle = () => {
+		if (this.minimapCollapsed) return;
+		const bounds = this.data.nodeBounds;
 		if (!bounds) return;
-		const viewWidth = this.container.clientWidth / scale;
-		const viewHeight = this.container.clientHeight / scale;
-		const viewportCenterX = -offsetX / scale + this.container.clientWidth / (2 * scale);
-		const viewportCenterY = -offsetY / scale + this.container.clientHeight / (2 * scale);
+		const viewWidth = this.data.container.clientWidth / this.data.scale;
+		const viewHeight = this.data.container.clientHeight / this.data.scale;
+		const viewportCenterX = -this.data.offsetX / this.data.scale + this.data.container.clientWidth / (2 * this.data.scale);
+		const viewportCenterY = -this.data.offsetY / this.data.scale + this.data.container.clientHeight / (2 * this.data.scale);
 		const viewRectX = this.minimapCache.centerX + (viewportCenterX - viewWidth / 2 - bounds.centerX) * this.minimapCache.scale;
 		const viewRectY = this.minimapCache.centerY + (viewportCenterY - viewHeight / 2 - bounds.centerY) * this.minimapCache.scale;
 		const viewRectWidth = viewWidth * this.minimapCache.scale;
@@ -171,19 +143,14 @@ export default class minimap extends EventTarget {
 		this.viewportRectangle.style.top = viewRectY + 'px';
 		this.viewportRectangle.style.width = viewRectWidth + 'px';
 		this.viewportRectangle.style.height = viewRectHeight + 'px';
-	}
+	};
 
-	dispose() {
-		this.toggleMinimapBtn.removeEventListener('click', this.toggleVisisbility);
+	private dispose() {
+		this.toggleMinimapBtn.removeEventListener('click', this.toggleVisibility);
 		this.minimapCtx.clearRect(0, 0, this.minimap.clientWidth, this.minimap.clientHeight);
 		this.minimapContainer.remove();
 		this._minimapContainer = null;
-		this._minimapCtx = null;
 		this._toggleMinimapBtn = null;
-		this._canvasData = null;
-		this._container = null;
-		this._nodeMap = null;
-		this._nodeBounds = null;
 		this._viewportRectangle = null;
 		this._minimap = null;
 	}

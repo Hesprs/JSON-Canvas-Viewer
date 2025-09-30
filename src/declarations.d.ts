@@ -43,6 +43,46 @@ declare global {
 		y: number;
 	}
 
+	interface Class<T> { new (...args: any[]): T }
+	interface Function { (...args: any[]): any }
+
+	interface nodeBounds {
+		minX: number;
+		minY: number;
+		maxX: number;
+		maxY: number;
+		width: number;
+		height: number;
+		centerX: number;
+		centerY: number;
+	}
+
+	interface runtimeData {
+		offsetX: number;
+		offsetY: number;
+		scale: number;
+		canvasData: JSONCanvas;
+		nodeMap: Record<string, JSONCanvasNode>;
+		canvasBaseDir: string;
+		nodeBounds: nodeBounds;
+		container: HTMLDivElement;
+	}
+
+	interface registry {
+		options: Record<string, Record<string, any>>;
+		extensions: Array<Class<runtimeData, registry>>;
+		hooks: Record<string, Array<Function>>;
+		api: Record<string, Record<string, Function>>;
+		register: (userRegistry: userRegistry) => void;
+	}
+
+	interface userRegistry {
+		options?: Record<string, Record<string, any>>;
+		extensions?: Array<Class<runtimeData, registry>>;
+		hooks?: Record<string, Array<Function>>;
+		api?: Record<string, Record<string, Function>>;
+	}
+
 	module '*.scss?inline' {
 		const content: string;
 		export default content;
