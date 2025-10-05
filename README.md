@@ -27,69 +27,39 @@ pnpm add json-canvas-viewer
 yarn add json-canvas-viewer
 ```
 
-The integrated version is a choice if your project _doesn't use Node.js_, which is built with `marked` and `json-canvas-viewer` inlined so that it can be deployed in vanilla JavaScript projects. Find the integrated version in [Release page](https://github.com/hesprs/JSON-Canvas-Viewer/releases).
-
 After installation, you can import the package as a module. It supports both ES module and CommonJS. JS, here we take ESM as an example:
 
 ```TypeScript
-// with Node.js
 import canvasViewer from 'json-canvas-viewer';
-
-// using integrated version
-import canvasViewer from 'path/to/canvasViewer.js';
 ```
 
 ## 🚀 Quick Start
 
-As a custom element (a simple way to embed, already defined in the code):
-
-```HTML
-<canvas-viewer
-    src="example/introduction.canvas"
-    extensions="minimap mistouchPrevention"
-    options="minimapCollapsed"
-></canvas-viewer>
-```
-
-Or instantiate the viewer (more flexible, but requires more code):
+Instantiate the viewer:
 
 ```HTML
 <div id="myCanvasContainer" style="width:800px; height:600px;"></div>
-<script>
-    const viewer = new canvasViewer(
- document.getElementById('myCanvasContainer'),
-        ['minimap', 'mistouchPrevention'],
-        ['minimapCollapsed']
-    );
- viewer.loadCanvas('example/introduction.canvas');
- viewer.addEventListener('interact', e => {
-        // handle node interaction
- });
+<script type="module">
+    import canvasViewer from 'json-canvas-viewer';
+    const viewer = new canvasViewer(document.getElementById('myCanvasContainer'));
+    viewer.loadCanvas('example/introduction.canvas');
     // dispose when not needed
- viewer.dispose();
+    viewer.dispose();
 </script>
 ```
 
-**Tip**: All emitted events are realized by `JavaScript CustomEvent`, so the event callback is stored in `event.detail`.
+And the viewer should be right in your container, you can instantiate the viewer multiple times to render multiple canvases simultaneously.
 
-If you are coding in TypeScript and intend to retrieve a Custom Event callback, please use the pattern below to make the type validator believe your code is type safe:
+**Methods**:
 
-```TypeScript
-const viewer: canvasViewer = new canvasViewer(...);
-viewer.loadCanvas(...);
-viewer.addEventListener('...', (e: Event) => {
-    if (e instanceof CustomEvent) {
-        // use e.detail safely here
-        console.log(e.detail);
- };
-});
-```
+- `loadCanvas(path)` — Load a canvas file (by path), **please put all the related files (files embedded in the canvas) in the same folder as the canvas file, wherever they originally are**.
+- `dispose()` — Clean up and remove viewer from DOM.
 
 ## 🐶 Features
 
 - View JSON Canvas files (`.canvas`) in a web browser
 - Full markdown syntax support (auto-parsed to HTML)
-- Embed into front-end projects using a container element or custom element
+- Embed into websites easily
 - Interactive pan and zoom functionality
 - Support for different node types:
   - Text nodes
@@ -100,76 +70,287 @@ viewer.addEventListener('...', (e: Event) => {
 - Minimap for easy navigation (optional extension)
 - Mistouch prevention (optional extension)
 - Responsive design with mobile and touchpad adaptation
+- Out-of-the-box extensibility and tree-shaking
+- TypeScript native support
 - 🔥 **Much more performant** than rendering canvases in Obsidian!
 
-## 🔌 API Reference
+## 🧩 Extensibility
 
-### Constructor
+### Registry
+
+The viewer implements the `registry`, which is a powerful orchestrator to streamline the development and extension of the viewer. The registry is the core of the viewer.
 
 ```TypeScript
-new canvasViewer(container, extensions, options);
+new canvasViewer(container, registry);
+
+interface registry {
+    options: Record<string, Record<string, any>>;
+    extensions: Array<Class<runtimeData, registry>>;
+    hooks: Record<string, Array<Function>>;
+    api: Record<string, Record<string, Function>>;
+    register: (userRegistry: userRegistry) => void;
+}
+interface Class<T> { new (...args: any[]): T }
+interface Function { (...args: any[]): any }
 ```
 
-- `container`: HTMLElement where the viewer will be rendered
-- `extensions`: (optional) Array (or space-separated string in case of custom element) of extension names to enable:
-  - `minimap` - Adds navigation minimap
-  - `mistouchPrevention` - Freezes canvas when clicking outside. **Warning: navigation methods (like `zoomIn()` or `resetView()`) cannot take effect if the canvas is frozen**.
-- `options`: (optional) Array (or space-separated string in case of custom element) of config options:
-  - `controlsHidden` - Hides the control panel
-  - `controlsCollapsed` - Starts with controls collapsed
-  - `proControlSchema` - Uses control keybindings in professional software (`mouse wheel`: scroll vertically; `mouse wheel` + `shift`: scroll horizontally; `mouse wheel` + `ctrl`: zoom), rather than zooming with the mouse wheel. The canvas viewer automatically detects and adjusts the control schema by default, but you can explicitly configure it. This option doesn't affect mobile control.
-  - `noShadow` - Disables shadow DOM, DOM elements will be appended to the light DOM directly. The canvas viewer will still be functional, but the styles may be affected.
-  - `noPreventionAtStart` (available when mistouchPrevention is enabled) Starts without prevention
-  - `minimapCollapsed` - (available when minimap is enabled) Starts with minimap collapsed
+The second parameter of the constructor is an object which is then merged with the default registry. You can also manually register using the `register` method.
 
-### Methods
+**Default Options and Values**:
 
-- `loadCanvas(path)` — Load a canvas file (by path), **please put all the related files (files embedded in the canvas) in the same folder as the canvas file, wherever they originally are**.
-- `shiftFullscreen(option)` — Toggle fullscreen mode ('toggle', 'enter', 'exit')
-- `resetView()` — Reset pan/zoom to fit canvas content
-- `zoomIn()` — Zoom in by a fixed step
-- `zoomOut()` — Zoom out by a fixed step
-- `setScale(scale)` — Set zoom level to a specific value (number, 0.05–20)
-- `panTo(x, y)` — Pan the view to a specific world coordinate
-- `dispose()` — Clean up and remove viewer from DOM
+```TypeScript
+{
+    main: {
+        noShadow: false,
+    },
+    interactor: {
+        preventDefault: true,
+        proControlSchema: false,
+        zoomFactor: 0.002,
+        lockControlSchema: false,
+	},
+}
+```
 
-### Events
+- `noShadow` — Disables shadow DOM, DOM elements will be appended to the light DOM directly. The canvas viewer will still be functional, but the styles may be affected.
+- `preventDefault` — Prevents default behavior of mouse events, the viewer may not work properly if set to false.
+- `proControlSchema` — Uses control keybindings in professional software (`mouse wheel`: scroll vertically; `mouse wheel + shift`: scroll horizontally; `mouse wheel + ctrl`: zoom), rather than zooming with the mouse wheel. The canvas viewer automatically detects and adjusts the control schema by default, but you can explicitly configure it. This option doesn't affect mobile control.
+- `zoomFactor` — The zoom factor, how fast the canvas zooms in or out.
+- `lockControlSchema` — Locks the control schema.
 
-Register with `viewer.addEventListener(event, callback)`.
+**Default Hooks**:
 
-- `interact` — Fired when a node is interacted with (`callback(node id, type: 'select' | 'preview')`)
-- `loaded` — Fired when a canvas file is loaded (`callback(canvasData)`)
+```TypeScript
+{
+    onDispose: [],
+    onRender: [],
+    onResize: [(width: number, height: number) => {}],
+    onClick: [(id: string | null) => {}],
+    onZoom: [],
+    onToggleFullscreen: [],
+    onInteractionStart: [],
+    onInteractionEnd: [],
+}
+```
+
+- `onDispose` — Called when the viewer is disposed.
+- `onRender` — Called when the viewer is rendered every frame.
+- `onResize` — Called when the viewer container is resized.
+  - `width` — The width of the resized viewer container.
+  - `height` — The height of the resized viewer container.
+- `onClick` — Called when the canvas is clicked.
+  - `id` — The id of the node that is clicked, or `null` if no node is clicked.
+- `onZoom` — Called when the zoom level changes.
+- `onToggleFullscreen` — Called when the fullscreen mode is toggled.
+- `onInteractionStart` — Called when the pointer enters a selected node.
+- `onInteractionEnd` — Called when the pointer leaves a selected node.
+
+**Default API**:
+
+```TypeScript
+{
+    main: {
+        loadCanvas: (path: string) => Promise<void>,
+        refresh: () => void, // Manually trigger a render
+        pan: (x: number, y: number) => void,
+        zoom: (factor: number, origin: Coordinates) => void,
+        zoomToScale: (newScale: number, origin: Coordinates) => void,
+        panToCoords: (x: number, y: number) => void,
+        shiftFullscreen: (option: 'toggle' | 'enter' | 'exit' = 'toggle') => void,
+        resetView: () => void, // Reset the scale and offset to default that the whole canvas is visible
+    },
+    dataManager: {
+        middleViewer: () => {
+            x: number; // half of the container width
+            y: number; // half of the container height
+            width: number; // container width
+            height: number; // container height
+        },
+        findNodeAtMousePosition: (mousePosition: Coordinates) => JSONCanvasNode | null,
+    },
+    interactionHandler: {
+        stop: () => void, // Stop receiving interaction
+        start: () => void, // Start receiving interaction
+    },
+}
+```
+
+### Extensions
+
+The viewer is built with extensibility in mind, and it is easy to extend the viewer with custom extensions.
+
+#### Official Extensions
+
+**minimap**: Renders the minimap with an overview of the canvas.
+  - used with:
+    ```TypeScript
+    import minimap from 'json-canvas-viewer/minimap';
+    new canvasViewer(container, { extensions: [minimap] });
+    ```
+  - new options and API:
+    ```TypeScript
+    {
+        options: {
+            minimap: {
+                collapsed: false,
+            },
+        },
+        api: {
+            minimap: {
+                toggleCollapse: () => void,
+            },
+        }
+    }
+    ```
+
+**mistouchPreventer**: Prevents mistouch by freezing the canvas when clicking outside the viewer.
+  - used with:
+    ```TypeScript
+    import mistouchPreventer from 'json-canvas-viewer/mistouchPreventer';
+    new canvasViewer(container, { extensions: [mistouchPreventer] });
+    ```
+  - new options and API:
+    ```TypeScript
+    {
+        options: {
+            mistouchPreventer: {
+                preventAtStart: true,
+            },
+        },
+        api: {
+            mistouchPreventer: {
+                startPrevention: () => void,
+                endPrevention: () => void,
+            },
+        }
+    }
+    ```
+
+**controls**: Shows a control bar with zoom, pan, scale slider, and fullscreen buttons.
+  - used with:
+    ```TypeScript
+    import controls from 'json-canvas-viewer/controls';
+    new canvasViewer(container, { extensions: [controls] });
+    ```
+  - new options and API:
+    ```TypeScript
+    {
+        options: {
+            controls: {
+                collapsed: false,
+            },
+        },
+        api: {
+            controls: {
+                toggleCollapse: () => void,
+            },
+        }
+    }
+    ```
+
+**debugPanel**: Shows a debug panel with scale and offset.
+  - used with:
+    ```TypeScript
+    import debugPanel from 'json-canvas-viewer/debugPanel';
+    new canvasViewer(container, { extensions: [debugPanel] });
+    ```
+  - new API:
+    ```TypeScript
+    {
+        api: {
+            debugPanel: {
+                update: () => void,
+            },
+        }
+    }
+    ```
+
+#### Develop an Extension
+
+An extension, in essence, is a class that follows a fixed pattern. You can do almost anything with the viewer by using an extension. Actually, the viewer runs with only four core extensions: `renderer`, `interactionHandler`, `overlayManager` and `dataManager`. Here is the fixed pattern:
+- receive `runtimeData` and `registry` as parameters in the constructor.
+- calls `registry.register` first in the constructor to define default options, register hooks and provide API.
+
+Here comes a minimal sample extension of a debug panel (JavaScript for simplicity):
+
+```JavaScript
+import { round } from '../utilities';
+
+export default class debugPanel {
+    constructor(data, registry) {
+        registry.register({
+            hooks: {
+                onRender: [this.update],
+                onDispose: [this.dispose],
+            },
+            api: {
+                debugPanel: {
+                    update: this.update,
+                },
+            },
+        });
+        this.debugPanel = document.createElement('div');
+        this.debugPanel.className = 'debug-panel';
+        this.data = data;
+        data.container.appendChild(this.debugPanel);
+    }
+
+    private update = () => {
+        this.debugPanel.innerHTML = `
+            <p>Scale: ${round(this.data.scale, 3)}</p>
+            <p>Offset: ${round(this.data.offsetX, 1)}, ${round(this.data.offsetY, 1)}</p>
+        `;
+    };
+
+    private dispose = () => {
+        this.debugPanel.remove();
+        this.debugPanel = null;
+    };
+}
+```
 
 ## 📂 Canvas File Structure
 
-The viewer expects JSON Canvas files in JSON format:
+The viewer expects JSON Canvas files in JSON format (a combination of official [JSON Canvas spec](https://jsoncanvas.org/spec/1.0/) and [Developer-Mike/obsidian-advanced-canvas spec](https://github.com/Developer-Mike/obsidian-advanced-canvas)):
 
-```JSON
-{
-    "nodes": [
-        {
-            "id": "unique-id",
-            "type": "text|file|link|group",
-            "x": 0,
-            "y": 0,
-            "width": 400,
-            "height": 400,
-            "text": "Content for text nodes",
-            "file": "filename for file nodes",
-            "url": "URL for link nodes",
-            "color": "color-id for groups"
-        }
-    ],
-    "edges": [
-        {
-            "id": "edge-id",
-            "fromNode": "source-node-id",
-            "toNode": "target-node-id",
-            "fromSide": "top|bottom|left|right",
-            "toSide": "top|bottom|left|right",
-            "label": "Optional edge label"
-        }
-    ]
+```TypeScript
+interface JSONCanvas {
+    nodes: Array<JSONCanvasNode>;
+    edges: Array<JSONCanvasEdge>;
+    metadata: {
+        version: string;
+        frontmatter: Record<string, string>;
+    };
+}
+
+interface JSONCanvasNode {
+    id: string;
+    type: 'group' | 'file' | 'text' | 'link';
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    label?: string;
+    background?: string;
+    backgroundStyle?: 'cover' | 'ratio' | 'repeat';
+    styleAttributes?: Record<string, string>;
+    color?: string;
+    text?: string;
+    file?: string;
+    subpath?: string;
+    url?: string;
+}
+
+interface JSONCanvasEdge {
+    id: string;
+    fromNode: string;
+    toNode: string;
+    fromSide: 'right' | 'left' | 'top' | 'bottom';
+    toSide: 'right' | 'left' | 'top' | 'bottom';
+    toEnd?: 'arrow' | 'none';
+    label?: string;
+    styleAttributes?: Record<string, string>;
+    color?: string;
 }
 ```
 
@@ -179,32 +360,27 @@ Built with `TypeScript`, `SCSS` and `HTML5 Canvas`.
 
 **Project Structure**:
 
-```bash
+```
 root
 ├── src/
-│   ├── canvasViewer.ts        // Main class-based component
-│   ├── controls.ts            // Controls panel
-│   ├── interactor.ts          // Handles pointer events for user pan/zoom
-│   ├── minimap.ts             // Minimap extension
-│   ├── mistouchPreventer.ts   // MistouchPrevention extension
-│   ├── overlayManager.ts      // Renderer for interactive nodes
-│   ├── previewModal.ts        // Preview modal
-│   ├── renderer.ts            // Renderer for non-interactive stuff + some shared exports
-│   ├── declarations.d.ts      // Public types
-│   └── styles.scss            // Styles for the viewer
+│   ├── extensions/
+│   │   ├── controls.ts            // Control panel
+│   │   ├── minimap.ts             // Minimap extension
+│   │   ├── mistouchPreventer.ts   // MistouchPrevention extension
+│   │   └── debugPanel.ts          // Debug panel
+│   ├── canvasViewer.ts            // Main entry point
+│   ├── interactor.ts              // Handles pointer events for user pan/zoom
+│   ├── dataManager.ts             // Manages canvas data
+│   ├── interactionHandler.ts      // Handles interaction events (wrapper of interactor)
+│   ├── overlayManager.ts          // Renderer for interactive nodes
+│   ├── renderer.ts                // Renderer for non-interactive stuff
+│   ├── declarations.d.ts          // Public types
+│   ├── utilities.ts               // Utility functions
+│   └── styles.scss                // Styles for the viewer
 └── example/
- └── index.html                // Example/test entry point
+    ├── index.html                 // Example/test entry point
+    └── Example Canvas/            // Example/test canvas file
 ```
-
-**Development Standards**:
-
-- Strict type validation, no non-null assertion operator `!` allowed.
-- Meticulous resource disposal, no memory leak ever possible.
-- Modularized components, avoid monolithic classes.
-
-**Extensibility**:
-
-You can extend `Marked` to support more markdown features. Please include `marked` as a dependency, and all [extensions based on Marked](https://marked.js.org/using_pro) are applied equally to the viewer.
 
 ## 📝 Copyright & License
 

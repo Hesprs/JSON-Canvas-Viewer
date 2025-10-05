@@ -92,13 +92,13 @@ export function resizeCanvasForDPR(canvas: HTMLCanvasElement, width: number, hei
 	ctx.scale(dpr, dpr);
 }
 
-export function deepMerge<T extends Record<string, any>>(main: T, toMerge: Record<string, any>, passive: boolean = false): T {
+export function deepMerge<T extends Record<string, any>>(main: T, toMerge: Record<string, any>, passive: boolean = false): void {
 	function isPlainObject(obj: any): boolean {
 		return obj !== null && typeof obj === 'object' && Object.prototype.toString.call(obj) === '[object Object]';
 	}
 	// Validate main object
 	if (main === null || typeof main !== 'object') throw new Error('Main must be a non-null object');
-	if (toMerge === null || typeof toMerge !== 'object') return main;
+	if (toMerge === null || typeof toMerge !== 'object') throw new Error('Nothing to merge');
 
 	// Process all own enumerable properties of toMerge
 	const keys = Object.keys(toMerge);
@@ -116,6 +116,9 @@ export function deepMerge<T extends Record<string, any>>(main: T, toMerge: Recor
 		// New property - add directly
 		else (main as Record<string, any>)[key] = value;
 	}
+}
 
-	return main;
+export function round(roundedNum: number, digits: number) {
+	const factor = 10 ** digits;
+	return Math.round(roundedNum * factor) / factor;
 }

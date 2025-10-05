@@ -21,6 +21,12 @@ export default class mistouchPreventer {
 					preventAtStart: true,
 				},
 			},
+			api: {
+				mistouchPreventer: {
+					startPrevention: this.startPrevention,
+					endPrevention: this.endPrevention,
+				},
+			},
 		});
 		this._preventionContainer = document.createElement('div');
 		this._preventionContainer.className = 'prevention-container hidden';
@@ -72,19 +78,19 @@ export default class mistouchPreventer {
 		}
 	};
 
-	startPrevention() {
+	private startPrevention = () => {
 		this.preventionContainer.classList.remove('hidden');
 		this.data.container.classList.add('numb');
 		this.preventMt = true;
 	}
 
-	endPrevention() {
+	private endPrevention = () => {
 		this.preventMt = false;
 		this.preventionContainer.classList.add('hidden');
 		setTimeout(() => this.data.container.classList.remove('numb'), 50); // minimum delay to prevent triggering undesired button touch
 	}
 
-	dispose() {
+	private dispose = () => {
 		window.removeEventListener('pointerdown', this.onPointerDown);
 		window.removeEventListener('pointermove', this.onPointerMove);
 		window.removeEventListener('pointerup', this.onPointerUp);

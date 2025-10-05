@@ -4,6 +4,7 @@
 		"module": "ESNext",
 		"moduleResolution": "bundler",
 		"outDir": "./dist",
+		"declarationDir": "./dist/types",
 		"strict": true,
 		"esModuleInterop": true,
 		"emitDeclarationOnly": true,
@@ -15,5 +16,5 @@
 		"lib": ["ES2022", "DOM"]
 	},
 	"include": ["src"],
-	"exclude": ["node_modules", "vite.config.ts", "eslint.config.ts", "tsconfig.json"]
+	"exclude": ["node_modules", "vite.config.ts", "dist"]
 }

@@ -113,11 +113,9 @@ export default class renderer {
 		this.canvas.style.transform = `translate(${currentOffsetX}px, ${currentOffsetY}px) scale(${cssScale})`;
 	}
 
-	private isViewportInside(inner: viewport, outer: viewport) {
-		return inner.left > outer.left && inner.top > outer.top && inner.right < outer.right && inner.bottom < outer.bottom;
-	}
+	private isViewportInside = (inner: viewport, outer: viewport) => inner.left > outer.left && inner.top > outer.top && inner.right < outer.right && inner.bottom < outer.bottom;
 
-	private getCurrentViewport(offsetX: number, offsetY: number, scale: number) {
+	private getCurrentViewport = (offsetX: number, offsetY: number, scale: number) => {
 		const left = -offsetX / scale;
 		const top = -offsetY / scale;
 		const right = left + this.data.container.clientWidth / scale;
@@ -125,7 +123,7 @@ export default class renderer {
 		return { left, top, right, bottom };
 	}
 
-	private drawLabelBar(x: number, y: number, label: string, color: string, scale: number) {
+	private drawLabelBar = (x: number, y: number, label: string, color: string, scale: number) => {
 		const barHeight = 30 * scale;
 		const radius = 6 * scale;
 		const yOffset = 8 * scale;
@@ -155,7 +153,7 @@ export default class renderer {
 		this.ctx.restore();
 	}
 
-	private drawNodeBackground(node: JSONCanvasNode) {
+	private drawNodeBackground = (node: JSONCanvasNode) => {
 		const colors = getColor(node.color);
 		const radius = NODE_RADIUS;
 		this.ctx.globalAlpha = 1.0;
@@ -168,19 +166,19 @@ export default class renderer {
 		this.ctx.stroke();
 	}
 
-	private drawGroup(node: JSONCanvasNode, scale: number) {
+	private drawGroup = (node: JSONCanvasNode, scale: number) => {
 		this.drawNodeBackground(node);
 		if (node.label) this.drawLabelBar(node.x, node.y, node.label, getColor(node.color).border, scale);
 	}
 
-	private drawFileNode(node: JSONCanvasNode) {
+	private drawFileNode = (node: JSONCanvasNode) => {
 		if (!node.file) throw unexpectedError;
 		this.ctx.fillStyle = FONT_COLOR;
 		this.ctx.font = '16px sans-serif';
 		this.ctx.fillText(node.file, node.x + 5, node.y - 10);
 	}
 
-	private drawEdge(edge: RuntimeJSONCanvasEdge) {
+	private drawEdge = (edge: RuntimeJSONCanvasEdge) => {
 		const { fromNode, toNode } = this.getEdgeNodes(edge);
 		if (!fromNode || !toNode) throw unexpectedError;
 		const [startX, startY] = getAnchorCoord(fromNode, edge.fromSide);
@@ -214,14 +212,12 @@ export default class renderer {
 		}
 	}
 
-	private getEdgeNodes(edge: JSONCanvasEdge) {
-		return {
-			fromNode: this.data.nodeMap[edge.fromNode],
-			toNode: this.data.nodeMap[edge.toNode],
-		};
-	}
+	private getEdgeNodes = (edge: JSONCanvasEdge) => ({
+		fromNode: this.data.nodeMap[edge.fromNode],
+		toNode: this.data.nodeMap[edge.toNode],
+	});
 
-	private getControlPoints(startX: number, startY: number, endX: number, endY: number, fromSide: string, toSide: string) {
+	private getControlPoints = (startX: number, startY: number, endX: number, endY: number, fromSide: string, toSide: string) => {
 		const distanceX = endX - startX;
 		const distanceY = endY - startY;
 		const realDistance = Math.min(Math.abs(distanceX), Math.abs(distanceY)) + 0.3 * Math.max(Math.abs(distanceX), Math.abs(distanceY));
@@ -262,7 +258,7 @@ export default class renderer {
 		return [startControlX, startControlY, endControlX, endControlY];
 	}
 
-	private drawCurvedPath(startX: number, startY: number, endX: number, endY: number, c1x: number, c1y: number, c2x: number, c2y: number) {
+	private drawCurvedPath = (startX: number, startY: number, endX: number, endY: number, c1x: number, c1y: number, c2x: number, c2y: number) => {
 		this.ctx.beginPath();
 		this.ctx.moveTo(startX, startY);
 		this.ctx.bezierCurveTo(c1x, c1y, c2x, c2y, endX, endY);
@@ -271,7 +267,7 @@ export default class renderer {
 		this.ctx.stroke();
 	}
 
-	private drawArrowhead(tipX: number, tipY: number, fromX: number, fromY: number) {
+	private drawArrowhead = (tipX: number, tipY: number, fromX: number, fromY: number) => {
 		const dx = tipX - fromX;
 		const dy = tipY - fromY;
 		const length = Math.sqrt(dx * dx + dy * dy);

@@ -1,6 +1,6 @@
 import { deepMerge } from './utilities';
 import styles from './styles.scss?inline';
-import { dataManager } from './dataManager';
+import dataManager from './dataManager';
 import interactionHandler from './interactionHandler';
 import overlayManager from './overlayManager';
 import renderer from './renderer';
@@ -9,7 +9,6 @@ export default class canvasViewer {
 	private animationId: null | number = null;
 	private resizeAnimationId: null | number = null;
 	private resizeObserver: ResizeObserver;
-	private dataManager: dataManager;
 	private perFrame: {
 		lastScale: number;
 		lastOffsets: { x: number; y: number };
@@ -51,21 +50,9 @@ export default class canvasViewer {
 		container: document.createElement('div'),
 	};
 	private registry: registry = {
-		options: {
-			main: {},
-		},
-		extensions: [renderer, interactionHandler, overlayManager],
-		hooks: {
-			onDispose: [],
-			onLoaded: [],
-			onRender: [],
-			onToggleFullscreen: [],
-			onZoom: [],
-			onClick: [],
-			onResize: [],
-			onInteractionEnd: [],
-			onInteractionStart: [],
-		},
+		options: {},
+		extensions: [dataManager, renderer, interactionHandler, overlayManager],
+		hooks: {},
 		api: {},
 		register: (userRegistry: userRegistry) => {
 			// push values into this.registry.extensions
@@ -83,6 +70,19 @@ export default class canvasViewer {
 
 	constructor(container: HTMLElement, userRegistry?: registry) {
 		if (userRegistry) this.registry.register(userRegistry);
+		this.registry.register({
+			options: {
+				main: {
+					noShadow: false,
+				},
+			},
+			api: {
+				main: {
+					loadCanvas: this.loadCanvas,
+					refresh: this.refresh,
+				},
+			},
+		});
 		while (container.firstElementChild) container.firstElementChild.remove();
 		container.innerHTML = '';
 
@@ -97,21 +97,6 @@ export default class canvasViewer {
 		this.data.container.classList.add('container');
 		realContainer.appendChild(this.data.container);
 
-		this.dataManager = new dataManager(this.data, this.registry);
-		this.registry.register({
-			api: {
-				main: {
-					pan: this.dataManager.pan,
-					zoom: this.dataManager.zoom,
-					zoomToScale: this.dataManager.zoomToScale,
-					shiftFullscreen: this.dataManager.shiftFullscreen,
-					resetView: this.dataManager.resetView,
-					findNodeAtMousePosition: this.dataManager.findNodeAtMousePosition,
-					judgeInteract: this.dataManager.judgeInteract,
-					middleScreen: this.dataManager.middleScreen,
-				},
-			},
-		});
 		this.resizeObserver = new ResizeObserver(this.onResize);
 		for (const extension of this.registry.extensions) new extension(this.data, this.registry);
 	}
@@ -129,22 +114,21 @@ export default class canvasViewer {
 
 	private onResize = () => {
 		this.resizeAnimationId = requestAnimationFrame(() => {
-			const center = this.dataManager.middleScreen();
+			const center = this.registry.api.dataManager.middleViewer();
 			if (this.lastResizeCenter.x && this.lastResizeCenter.y) {
 				this.data.offsetX += center.x - this.lastResizeCenter.x;
 				this.data.offsetY += center.y - this.lastResizeCenter.y;
 			}
 			this.lastResizeCenter.x = center.x;
 			this.lastResizeCenter.y = center.y;
-			for (const hook of this.registry.hooks.onResize) hook(center.x * 2, center.y * 2);
+			for (const hook of this.registry.hooks.onResize) hook(center.width, center.height);
 			this.refresh();
 		});
 	};
 
 	async loadCanvas(path: string) {
-		await this.dataManager.loadCanvas(path);
-		this.dataManager.resetView();
-		for (const hook of this.registry.hooks.onLoaded) hook();
+		for (const hook of this.registry.hooks.onLoad) await hook(path);
+		this.registry.api.main.resetView();
 		this.resizeObserver.observe(this.data.container);
 		this.animationId = requestAnimationFrame(this.draw);
 	}

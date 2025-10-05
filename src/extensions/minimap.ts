@@ -30,13 +30,18 @@ export default class minimap {
 	constructor(data: runtimeData, registry: registry) {
 		registry.register({
 			hooks: {
-				onLoaded: [this.drawMinimap],
+				onLoad: [this.drawMinimap],
 				onRender: [this.updateViewportRectangle],
 				onDispose: [this.dispose],
 			},
 			options: {
 				minimap: {
 					collapsed: false,
+				},
+			},
+			api: {
+				minimap: {
+					toggleCollapse: this.toggleCollapse,
 				},
 			},
 		});
@@ -73,11 +78,11 @@ export default class minimap {
 			centerX: 0,
 			centerY: 0,
 		};
-		this._toggleMinimapBtn.addEventListener('click', this.toggleVisibility);
+		this._toggleMinimapBtn.addEventListener('click', this.toggleCollapse);
 		resizeCanvasForDPR(minimapCanvas, minimapCanvas.width, minimapCanvas.height);
 	}
 
-	private toggleVisibility = () => {
+	private toggleCollapse = () => {
 		this.minimapCollapsed = !this.minimapCollapsed;
 		this.minimapContainer.classList.toggle('collapsed');
 		if (!this.minimapCollapsed) this.updateViewportRectangle();
@@ -98,12 +103,12 @@ export default class minimap {
 		this.minimapCtx.translate(this.minimapCache.centerX, this.minimapCache.centerY);
 		this.minimapCtx.scale(this.minimapCache.scale, this.minimapCache.scale);
 		this.minimapCtx.translate(-bounds.centerX, -bounds.centerY);
-		for (let edge of this.data.canvasData.edges) this.drawMinimapEdge(edge);
-		for (let node of this.data.canvasData.nodes) this.drawMinimapNode(node);
+		for (const edge of this.data.canvasData.edges) this.drawMinimapEdge(edge);
+		for (const node of this.data.canvasData.nodes) this.drawMinimapNode(node);
 		this.minimapCtx.restore();
 	};
 
-	private drawMinimapNode(node: JSONCanvasNode) {
+	private drawMinimapNode = (node: JSONCanvasNode) => {
 		const colors = getColor(node.color);
 		const radius = 25;
 		this.minimapCtx.fillStyle = colors.border;
@@ -111,9 +116,9 @@ export default class minimap {
 		drawRoundRect(this.minimapCtx, node.x, node.y, node.width, node.height, radius);
 		this.minimapCtx.fill();
 		this.minimapCtx.globalAlpha = 1.0;
-	}
+	};
 
-	private drawMinimapEdge(edge: JSONCanvasEdge) {
+	private drawMinimapEdge = (edge: JSONCanvasEdge) => {
 		const fromNode = this.data.nodeMap[edge.fromNode];
 		const toNode = this.data.nodeMap[edge.toNode];
 		if (!fromNode || !toNode) return;
@@ -125,7 +130,7 @@ export default class minimap {
 		this.minimapCtx.strokeStyle = '#555';
 		this.minimapCtx.lineWidth = 10;
 		this.minimapCtx.stroke();
-	}
+	};
 
 	private updateViewportRectangle = () => {
 		if (this.minimapCollapsed) return;
@@ -145,13 +150,13 @@ export default class minimap {
 		this.viewportRectangle.style.height = viewRectHeight + 'px';
 	};
 
-	private dispose() {
-		this.toggleMinimapBtn.removeEventListener('click', this.toggleVisibility);
+	private dispose = () => {
+		this.toggleMinimapBtn.removeEventListener('click', this.toggleCollapse);
 		this.minimapCtx.clearRect(0, 0, this.minimap.clientWidth, this.minimap.clientHeight);
 		this.minimapContainer.remove();
 		this._minimapContainer = null;
 		this._toggleMinimapBtn = null;
 		this._viewportRectangle = null;
 		this._minimap = null;
-	}
+	};
 }

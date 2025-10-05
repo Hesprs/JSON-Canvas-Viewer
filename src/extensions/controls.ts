@@ -44,13 +44,18 @@ export default class controls {
 			hooks: {
 				onToggleFullscreen: [this.updateFullscreenBtn],
 				onZoom: [this.updateSlider],
-				onLoaded: [() => this.updateSlider(data.scale)],
+				onLoad: [this.updateSlider],
 			},
 			options: {
 				controls: {
 					collapsed: false,
 				},
 			},
+			api: {
+				controls: {
+					toggleCollapse: this.toggleCollapse,
+				},
+			}
 		});
 
 		this._controlsPanel = document.createElement('div');
@@ -93,22 +98,20 @@ export default class controls {
 
 		data.container.appendChild(this._controlsPanel);
 
+		this.registry = registry;
+
 		this._toggleCollapseBtn.addEventListener('click', this.toggleCollapse);
 		this._zoomInBtn.addEventListener('click', this.zoomIn);
 		this._zoomOutBtn.addEventListener('click', this.zoomOut);
 		this._zoomSlider.addEventListener('input', this.slide);
-		this._resetViewBtn.addEventListener('click', this.resetView);
-		this._toggleFullscreenBtn.addEventListener('click', this.onToggleFullscreen);
-
-		this.registry = registry;
+		this._resetViewBtn.addEventListener('click', this.registry.api.main.resetView);
+		this._toggleFullscreenBtn.addEventListener('click', this.registry.api.main.shiftFullscreen);
 	}
 
 	private toggleCollapse = () => this.controlsPanel.classList.toggle('collapsed');
-	private zoomIn = () => this.registry.api.main.zoom(1.1, this.registry.api.main.middleScreen());
-	private zoomOut = () => this.registry.api.main.zoom(1 / 1.1, this.registry.api.main.middleScreen());
-	private slide = () => this.registry.api.main.zoomToScale(Math.pow(1.1, Number(this.zoomSlider.value)), this.registry.api.main.middleScreen());
-	private resetView = () => this.registry.api.main.resetView();
-	private onToggleFullscreen = () => this.registry.api.main.shiftFullscreen();
+	private zoomIn = () => this.registry.api.main.zoom(1.1, this.registry.api.dataManager.middleViewer());
+	private zoomOut = () => this.registry.api.main.zoom(1 / 1.1, this.registry.api.dataManager.middleViewer());
+	private slide = () => this.registry.api.main.zoomToScale(Math.pow(1.1, Number(this.zoomSlider.value)), this.registry.api.dataManager.middleViewer());
 
 	private updateFullscreenBtn() {
 		if (document.fullscreenElement === null) this.toggleFullscreenBtn.innerHTML = `<svg viewBox="-40.32 -40.32 176.64 176.64"><path d="M30 60H6a6 6 0 0 0 0 12h18v18a6 6 0 0 0 12 0V66a5.997 5.997 0 0 0-6-6Zm60 0H66a5.997 5.997 0 0 0-6 6v24a6 6 0 0 0 12 0V72h18a6 6 0 0 0 0-12ZM66 36h24a6 6 0 0 0 0-12H72V6a6 6 0 0 0-12 0v24a5.997 5.997 0 0 0 6 6ZM30 0a5.997 5.997 0 0 0-6 6v18H6a6 6 0 0 0 0 12h24a5.997 5.997 0 0 0 6-6V6a5.997 5.997 0 0 0-6-6Z"/></svg>`;
@@ -118,13 +121,13 @@ export default class controls {
 	private updateSlider = (scale: number) => (this.zoomSlider.value = String(this.scaleToSlider(scale)));
 	private scaleToSlider = (scale: number) => Math.log(scale) / Math.log(1.1);
 
-	dispose() {
+	private dispose = () => {
 		this.toggleCollapseBtn.removeEventListener('click', this.toggleCollapse);
 		this.zoomInBtn.removeEventListener('click', this.zoomIn);
 		this.zoomOutBtn.removeEventListener('click', this.zoomOut);
 		this.zoomSlider.removeEventListener('input', this.slide);
-		this.resetViewBtn.removeEventListener('click', this.resetView);
-		this.toggleFullscreenBtn.removeEventListener('click', this.onToggleFullscreen);
+		this.resetViewBtn.removeEventListener('click', this.registry.api.main.resetView);
+		this.toggleFullscreenBtn.removeEventListener('click', this.registry.api.main.shiftFullscreen);
 		this.controlsPanel.remove();
 		this._controlsPanel = null;
 		this._toggleCollapseBtn = null;
@@ -133,5 +136,5 @@ export default class controls {
 		this._zoomSlider = null;
 		this._resetViewBtn = null;
 		this._toggleFullscreenBtn = null;
-	}
+	};
 }

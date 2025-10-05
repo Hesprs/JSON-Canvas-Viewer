@@ -23,7 +23,8 @@
 	height: 100%;
 	overflow: hidden;
 	background-color: #141414;
-	&.numb, &.numb * {
+	&.numb,
+	&.numb * {
 		pointer-events: none !important;
 	}
 }
@@ -48,6 +49,21 @@
 		line-height: calc(17px + 0.3vw);
 		text-align: center;
 	}
+}
+
+.debug-panel {
+	position: absolute;
+	bottom: 12px;
+	left: 12px;
+	background: rgba(0, 0, 0, 0.4);
+	border-radius: 12px;
+	padding: 12px;
+	backdrop-filter: blur(8px) saturate(1.5);
+	border: 2px solid rgba(140, 140, 140, 0.75);
+	color: #fff;
+	font-size: calc(14px + 0.3vw);
+	line-height: calc(17px + 0.3vw);
+	pointer-events: none;
 }
 
 .main-canvas {
@@ -251,7 +267,8 @@ button {
 	}
 }
 
-.link-iframe, .audio {
+.link-iframe,
+.audio {
 	@extend .full;
 	border: none;
 	background: transparent;

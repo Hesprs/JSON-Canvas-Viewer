@@ -1,4 +1,4 @@
-import { unexpectedError } from './utilities';
+import { unexpectedError, round } from './utilities';
 
 export default class interactor extends EventTarget {
 	private monitoringElement: HTMLElement;
@@ -16,6 +16,9 @@ export default class interactor extends EventTarget {
 	private pinchZoomState: {
 		lastDistance: number;
 		lastMidpoint: { x: number; y: number };
+	} = {
+			lastDistance: 0,
+			lastMidpoint: { x: 0, y: 0 },
 	};
 	private proControlSchema: boolean;
 	private zoomFactor: number;
@@ -23,20 +26,14 @@ export default class interactor extends EventTarget {
 	private lockControlSchema: boolean;
 	private ctrlZoomFactor: number;
 
-	constructor(monitoringElement: HTMLElement, options?: { preventDefault?: boolean; proControlSchema?: boolean; zoomFactor?: number; lockControlSchema?: boolean }) {
+	constructor(monitoringElement: HTMLElement, options: { preventDefault?: boolean; proControlSchema?: boolean; zoomFactor?: number; lockControlSchema?: boolean } = {}) {
 		super();
 		this.monitoringElement = monitoringElement;
-		const option = options || {};
-		this.preventDefault = option.preventDefault || false;
-		this.proControlSchema = option.proControlSchema || false;
-		this.zoomFactor = option.zoomFactor || 0.002;
-		this.ctrlZoomFactor = option.zoomFactor ? option.zoomFactor * 50 : 0.1;
-		this.lockControlSchema = option.lockControlSchema || false;
-		this.pointers.clear();
-		this.pinchZoomState = {
-			lastDistance: 0,
-			lastMidpoint: { x: 0, y: 0 },
-		};
+		this.preventDefault = options.preventDefault || false;
+		this.proControlSchema = options.proControlSchema || false;
+		this.zoomFactor = options.zoomFactor || 0.002;
+		this.ctrlZoomFactor = options.zoomFactor ? options.zoomFactor * 50 : 0.1;
+		this.lockControlSchema = options.lockControlSchema || false;
 	}
 
 	private getNthValue(n: number) {
@@ -119,7 +116,7 @@ export default class interactor extends EventTarget {
 			const newDistance = this.getPointerDistance();
 			const newMidpointOnScreen = this.getPointerMidpoint();
 			if (!newDistance || !newMidpointOnScreen) throw unexpectedError;
-			let zoomFactor = newDistance / this.pinchZoomState.lastDistance;
+			const zoomFactor = newDistance / this.pinchZoomState.lastDistance;
 			this.pinchZoomState.lastDistance = newDistance;
 			const newMidpoint = this.S2C(newMidpointOnScreen);
 			const dx = newMidpoint.x - this.pinchZoomState.lastMidpoint.x;
@@ -162,25 +159,20 @@ export default class interactor extends EventTarget {
 
 	private dispatchPanEvent(diff: Coordinates) {
 		const roundedDiff = {
-			x: this.round(diff.x, 1),
-			y: this.round(diff.y, 1),
+			x: round(diff.x, 1),
+			y: round(diff.y, 1),
 		};
 		const panEvent = new CustomEvent<Coordinates>('pan', { detail: roundedDiff });
 		this.dispatchEvent(panEvent);
 	}
 
 	private dispatchZoomEvent(factor: number, origin: Coordinates) {
-		const roundedFactor = this.round(factor, 4);
+		const roundedFactor = round(factor, 4);
 		const zoomEvent = new CustomEvent<{ factor: number; origin: Coordinates }>('zoom', { detail: { factor: roundedFactor, origin: origin } });
 		this.dispatchEvent(zoomEvent);
 	}
 
 	private preventDefaultFunction = (e: Event) => e.preventDefault;
-
-	private round(roundedNum: number, digits: number) {
-		const factor = 10 ** digits;
-		return Math.round(roundedNum * factor) / factor;
-	}
 
 	stop = () => {
 		this.monitoringElement.removeEventListener('pointerdown', this.onPointerDown);

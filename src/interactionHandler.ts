@@ -1,5 +1,4 @@
 import interactor from './interactor';
-import { unexpectedError } from './utilities';
 
 export default class interactionHandler {
 	private interactor: interactor;
@@ -8,7 +7,7 @@ export default class interactionHandler {
 	constructor(data: runtimeData, registry: registry) {
 		registry.register({
 			hooks: {
-				onLoaded: [this.onLoaded],
+				onLoad: [this.onLoad],
 				onDispose: [this.dispose],
 				onInteractionStart: [this.stop],
 				onInteractionEnd: [this.start],
@@ -21,6 +20,12 @@ export default class interactionHandler {
 					lockControlSchema: false,
 				},
 			},
+			api: {
+				interactionHandler: {
+					stop: this.stop,
+					start: this.start,
+				},
+			},
 		});
 		this.interactor = new interactor(data.container, registry.options.interactor);
 		this.registry = registry;
@@ -29,7 +34,7 @@ export default class interactionHandler {
 	private stop = () => this.interactor.stop();
 	private start = () => this.interactor.start();
 
-	private onLoaded = () => {
+	private onLoad = () => {
 		this.interactor.addEventListener('pan', this.onPan);
 		this.interactor.addEventListener('zoom', this.onZoom);
 		this.interactor.addEventListener('trueClick', this.onClick);
@@ -49,9 +54,9 @@ export default class interactionHandler {
 		}
 		if (e instanceof CustomEvent) {
 			if (isUIControl(e.detail.target)) return;
-			const node = this.registry.api.main.findNodeAtMousePosition(e.detail.position);
+			const node = this.registry.api.dataManager.findNodeAtMousePosition(e.detail.position);
 			for (const hook of this.registry.hooks.onClick) hook(node?.id || null);
-		} else throw unexpectedError;
+		}
 	};
 
 	private dispose = () => {

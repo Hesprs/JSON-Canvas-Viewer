@@ -2,51 +2,49 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import terser from '@rollup/plugin-terser';
+import { readdirSync } from 'fs';
 
-const standalone = process.env.standalone === 'true';
-const external = standalone ? [] : ['marked'];
-const output = standalone
-	? [
-			{
-				format: 'es',
-				entryFileNames: `canvasViewer.js`,
-				plugins: [terser()],
-			},
-	  ]
-	: [
-			{
-				format: 'es',
-				entryFileNames: `canvasViewer.esm.js`,
-				plugins: [terser()],
-			},
-			{
-				format: 'cjs',
-				entryFileNames: `canvasViewer.cjs.js`,
-			},
-	  ];
+// Auto-detect entry points from src directory
+const srcDir = resolve(__dirname, 'src', 'extensions');
+const extensions = readdirSync(srcDir)
+	.filter(file => file.endsWith('.ts') || file.endsWith('.js'))
+	.reduce((entries, file) => {
+		const name = file.replace(/\.(ts|js)$/, '');
+		entries[name] = resolve(srcDir, file);
+		return entries;
+	}, {} as Record<string, string>);
 
 export default defineConfig({
-	root: resolve(__dirname, 'example'),
+	root: 'example',
 	resolve: {
 		alias: {
 			'@': resolve(__dirname, 'src/'),
+			'$': resolve(__dirname, 'dist/es/'),
 		},
 	},
 	build: {
 		outDir: resolve(__dirname, 'dist'),
-		emptyOutDir: !standalone,
+		emptyOutDir: true,
 		minify: 'esbuild',
-		cssCodeSplit: false,
 		lib: {
-			entry: resolve(__dirname, 'src/canvasViewer.ts'),
+			entry: {
+				index: resolve(__dirname, 'src', 'canvasViewer.ts'),
+				...extensions,
+			},
 			name: 'canvasViewer',
+			formats: ['es', 'cjs'],
 		},
 		rollupOptions: {
-			external: external,
-			output: output,
+			external: ['marked'],
+			output: {
+				entryFileNames: ({ name }) => {
+					if (name === 'index') {
+						return '[format]/index.js';
+					}
+					return '[format]/[name].js';
+				},
+				plugins: [terser()],
+			},
 		},
-	},
-	server: {
-		open: '/',
 	},
 });

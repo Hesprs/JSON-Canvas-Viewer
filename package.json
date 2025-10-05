@@ -1,16 +1,38 @@
 {
 	"name": "json-canvas-viewer",
-	"version": "3.0.4",
+	"version": "3.1.0",
 	"description": "A TypeScript-based viewer for JSON Canvas, easy to embed into websites.",
 	"type": "module",
-	"types": "dist/canvasViewer.d.ts",
-	"main": "dist/canvasViewer.cjs.js",
-	"module": "dist/canvasViewer.esm.js",
+	"types": "dist/types/canvasViewer.d.ts",
+	"main": "dist/cjs/index.js",
+	"module": "dist/es/index.js",
 	"exports": {
 		".": {
-			"types": "./dist/canvasViewer.d.ts",
-			"import": "./dist/canvasViewer.esm.js",
-			"require": "./dist/canvasViewer.cjs.js"
+			"types": "./dist/types/canvasViewer.d.ts",
+			"import": "./dist/es/index.js",
+			"require": "./dist/cjs/index.js"
+		},
+		"./minimap": {
+			"types": "./dist/types/extensions/minimap.d.ts",
+			"import": "./dist/es/minimap.js",
+			"require": "./dist/cjs/minimap.js"
+		},
+		"./controls": {
+			"types": "./dist/types/extensions/controls.d.ts",
+			"import": "./dist/es/controls.js",
+			"require": "./dist/cjs/controls.js"
+		},
+		"./mistouchPreventer": {
+			"types": "./dist/types/extensions/mistouchPreventer.d.ts",
+			"import": "./dist/es/mistouchPreventer.js",
+			"require": "./dist/cjs/mistouchPreventer.js"
+		}
+	},
+	"typesVersions": {
+		"*": {
+			"minimap": ["dist/types/extensions/minimap.d.ts"],
+			"controls": ["dist/types/extensions/controls.d.ts"],
+			"mistouchPreventer": ["dist/types/extensions/mistouchPreventer.d.ts"]
 		}
 	},
 	"repository": {
@@ -36,17 +58,14 @@
 	"license": "MIT",
 	"packageManager": "pnpm@10.15.1",
 	"devDependencies": {
+		"@eslint/js": "^9.36.0",
 		"@rollup/plugin-terser": "^0.4.4",
 		"@types/node": "^24.2.1",
-		"@typescript-eslint/eslint-plugin": "^8.39.1",
-		"@typescript-eslint/parser": "^8.39.1",
-		"cross-env": "^10.0.0",
 		"eslint": "^9.32.0",
 		"eslint-config-prettier": "^10.1.8",
-		"globals": "^16.3.0",
-		"jiti": "^2.6.0",
 		"sass": "^1.90.0",
 		"typescript": "^5.9.2",
+		"typescript-eslint": "^8.45.0",
 		"vite": "^7.1.1"
 	},
 	"files": [
@@ -56,9 +75,7 @@
 		"test": "vite --open",
 		"lint": "eslint .",
 		"build-types": "tsc --project tsconfig.json",
-		"build-for-distribution": "vite build && pnpm run build-types",
-		"build-standalone": "cross-env standalone=true vite build",
-		"build": "pnpm run build-for-distribution && pnpm run build-standalone"
+		"build": "vite build && pnpm run build-types"
 	},
 	"dependencies": {
 		"marked": "^16.1.2"

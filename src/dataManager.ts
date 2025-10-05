@@ -2,17 +2,49 @@ import { unexpectedError } from './utilities';
 
 const GRID_CELL_SIZE = 800;
 const INITIAL_VIEWPORT_PADDING = 100;
-const ZOOM_SMOOTHNESS = 0.25;
+const RESISTANCE = 40;
 
-export class dataManager {
+export default class dataManager {
 	data: runtimeData;
 	registry: registry;
 	spatialGrid: Record<string, Array<JSONCanvasNode>> | null = null;
+	acceleration: {
+		pan: {
+			x: number;
+			y: number;
+		};
+		zoom: number;
+	} = {
+		pan: { x: 0, y: 0 },
+		zoom: 0,
+	};
+	animationId: number | null = null;
+
 	constructor(data: runtimeData, registry: registry) {
+		registry.register({
+			api: {
+				main: {
+					pan: this.pan,
+					zoom: this.zoom,
+					zoomToScale: this.zoomToScale,
+					panToCoords: this.panToCoords,
+					shiftFullscreen: this.shiftFullscreen,
+					resetView: this.resetView,
+				},
+				dataManager: {
+					middleViewer: this.middleViewer,
+					findNodeAtMousePosition: this.findNodeAtMousePosition,
+				},
+			},
+			hooks: {
+				onLoad: [async (path: string) => await this.loadCanvas(path)],
+				onDispose: [this.dispose],
+			},
+		});
 		this.data = data;
 		this.registry = registry;
 	}
-	async loadCanvas(path: string) {
+	loadCanvas = async (path: string) => {
 		try {
 			if (/^https?:\/\//.test(path)) this.data.canvasBaseDir = path.substring(0, path.lastIndexOf('/') + 1);
 			else {
@@ -32,9 +64,9 @@ export class dataManager {
 		} catch (err) {
 			console.error('Failed to load canvas data:', err);
 		}
-	}
+	};
 
-	findNodeAtMousePosition = ({ x: mouseX, y: mouseY }: Coordinates) => {
+	private findNodeAtMousePosition = ({ x: mouseX, y: mouseY }: Coordinates) => {
 		const { x, y } = this.C2W(this.C2C({ x: mouseX, y: mouseY }));
 		let candidates: Array<JSONCanvasNode> = [];
 		if (!this.spatialGrid) candidates = this.data.canvasData.nodes;
@@ -52,23 +84,24 @@ export class dataManager {
 	};
 
 	// how should the app handle node interactions
-	judgeInteract = (node: JSONCanvasNode | null) => {
+	private judgeInteract = (node: JSONCanvasNode | null) => {
 		const type = !node ? 'default' : node.type;
 		switch (type) {
 			case 'text':
 			case 'link':
 				return 'select';
-			case 'file':
+			case 'file': {
 				const file = node?.file;
 				if (!file) throw unexpectedError;
 				if (file.match(/\.(md|wav|mp3)$/i)) return 'select';
 				else return 'non-interactive';
+			}
 			default:
 				return 'non-interactive';
 		}
 	};
 
-	calculateNodeBounds() {
+	private calculateNodeBounds() {
 		let minX = Infinity,
 			minY = Infinity,
 			maxX = -Infinity,
@@ -86,10 +119,10 @@ export class dataManager {
 		return { minX, minY, maxX, maxY, width, height, centerX, centerY };
 	}
 
-	buildSpatialGrid() {
+	private buildSpatialGrid() {
 		if (this.data.canvasData.nodes.length < 50) return;
 		this.spatialGrid = {};
-		for (let node of this.data.canvasData.nodes) {
+		for (const node of this.data.canvasData.nodes) {
 			const minCol = Math.floor(node.x / GRID_CELL_SIZE);
 			const maxCol = Math.floor((node.x + node.width) / GRID_CELL_SIZE);
 			const minRow = Math.floor(node.y / GRID_CELL_SIZE);
@@ -104,11 +137,11 @@ export class dataManager {
 		}
 	}
 
-	zoom = (factor: number, origin: Coordinates) => {
+	private zoom = (factor: number, origin: Coordinates) => {
 		const newScale = this.data.scale * factor;
 		this.zoomToScale(newScale, origin);
 	};
-	zoomToScale = (newScale: number, origin: Coordinates) => {
+	private zoomToScale = (newScale: number, origin: Coordinates) => {
 		const validNewScale = Math.max(Math.min(newScale, 20), 0.05);
 		if (validNewScale === this.data.scale) return;
 		const canvasCoords = this.C2C(origin);
@@ -117,20 +150,20 @@ export class dataManager {
 		this.data.scale = validNewScale;
 		for (const hook of this.registry.hooks.onZoom) hook(validNewScale);
 	};
-	pan = ({ x, y }: Coordinates) => {
+	private pan = ({ x, y }: Coordinates) => {
 		this.data.offsetX += x;
 		this.data.offsetY += y;
 	};
-	panToCoords = ({ x, y }: Coordinates) => {
+	private panToCoords = ({ x, y }: Coordinates) => {
 		this.data.offsetX = x;
 		this.data.offsetY = y;
 	};
-	shiftFullscreen = (option: string = 'toggle') => {
+	private shiftFullscreen = (option: string = 'toggle') => {
 		if (!document.fullscreenElement && (option === 'toggle' || option === 'enter')) this.data.container.requestFullscreen();
 		else if (document.fullscreenElement && (option === 'toggle' || option === 'exit')) document.exitFullscreen();
 		for (const hook of this.registry.hooks.onToggleFullscreen) hook();
 	};
-	resetView = () => {
+	private resetView = () => {
 		const bounds = this.data.nodeBounds;
 		if (!bounds || !this.data.container) return;
 		const contentWidth = bounds.width + INITIAL_VIEWPORT_PADDING * 2;
@@ -154,34 +187,42 @@ export class dataManager {
 	};
 
 	// Container to Canvas
-	C2C({ x: containerX, y: containerY }: Coordinates) {
-		return {
-			x: containerX - this.data.offsetX,
-			y: containerY - this.data.offsetY,
-		};
-	}
+	private C2C = ({ x: containerX, y: containerY }: Coordinates) => ({
+		x: containerX - this.data.offsetX,
+		y: containerY - this.data.offsetY,
+	});
 	// Canvas to World
-	C2W({ x: canvasX, y: canvasY }: Coordinates) {
-		return {
-			x: canvasX / this.data.scale,
-			y: canvasY / this.data.scale,
-		};
-	}
+	private C2W = ({ x: canvasX, y: canvasY }: Coordinates) => ({
+		x: canvasX / this.data.scale,
+		y: canvasY / this.data.scale,
+	});
 
-	middleScreen = () => {
+	private middleViewer = () => {
 		return {
 			x: this.data.container.clientWidth / 2,
 			y: this.data.container.clientHeight / 2,
+			width: this.data.container.clientWidth,
+			height: this.data.container.clientHeight,
 		};
 	};
 
-	smoothZoom = () => {
-		const scaleDiff = this.perFrame.targetScale - this.data.scale;
-		let newScale;
-		if (Math.abs(scaleDiff) < this.perFrame.targetScale * 0.01 + 0.002) {
-			newScale = this.perFrame.targetScale;
-			this.perFrame.smoothZoom = false;
-		} else newScale = Math.round((data.scale + scaleDiff * ZOOM_SMOOTHNESS) * 1000) / 1000;
-		navigator.zoomToScale(newScale, middleScreen());
+	private animator = () => {
+		if (this.acceleration.pan.x !== 0 || this.acceleration.pan.y !== 0 || this.acceleration.zoom !== 0) {
+			this.data.offsetX += this.acceleration.pan.x;
+			this.data.offsetY += this.acceleration.pan.y;
+			this.data.scale *= this.acceleration.zoom;
+			if (this.acceleration.pan.x >= RESISTANCE) this.acceleration.pan.x -= RESISTANCE;
+			else this.acceleration.pan.x = 0;
+			if (this.acceleration.pan.y >= RESISTANCE) this.acceleration.pan.y -= RESISTANCE;
+			else this.acceleration.pan.y = 0;
+			if (this.acceleration.zoom >= RESISTANCE) this.acceleration.zoom -= RESISTANCE;
+			else this.acceleration.zoom = 1;
+		}
+		this.animationId = requestAnimationFrame(this.animator);
+	};
+
+	private dispose = () => {
+		if (this.animationId) cancelAnimationFrame(this.animationId);
+		this.animationId = null;
 	};
 }

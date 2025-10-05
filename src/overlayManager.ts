@@ -17,7 +17,7 @@ export default class overlayManager {
 	constructor(data: runtimeData, registry: registry) {
 		registry.register({
 			hooks: {
-				onLoaded: [this.onLoaded],
+				onLoad: [this.onLoad],
 				onDispose: [this.dispose],
 				onRender: [this.updateOverlays],
 				onClick: [(id: string | null) => this.select(id)],
@@ -30,7 +30,7 @@ export default class overlayManager {
 		this.registry = registry;
 	}
 
-	private onLoaded = () => {
+	private onLoad = () => {
 		const overlayCreators = {
 			text: (node: RuntimeJSONCanvasNode) => {
 				if (!node.text) throw unexpectedError;
@@ -51,7 +51,7 @@ export default class overlayManager {
 		Object.values(this.data.nodeMap).forEach(node => overlayCreators[node.type](node));
 	};
 
-	private select(id: string | null) {
+	private select = (id: string | null) => {
 		const previous = !this.selectedId ? null : this.overlays[this.selectedId];
 		const current = !id ? null : this.overlays[id];
 		if (previous) previous.classList.remove('active');
@@ -60,9 +60,9 @@ export default class overlayManager {
 			this.startInteract();
 		} else this.endInteract();
 		this.selectedId = id;
-	}
+	};
 
-	private async loadMarkdownForNode(node: RuntimeJSONCanvasNode) {
+	private loadMarkdownForNode = async (node: RuntimeJSONCanvasNode) => {
 		if (!node.mdContent) {
 			node.mdContent = 'Loading...';
 			this.updateOrCreateOverlay(node, node.mdContent, 'markdown');
@@ -86,7 +86,7 @@ export default class overlayManager {
 			}
 		}
 		this.updateOrCreateOverlay(node, node.mdContent, 'markdown');
-	}
+	};
 
 	private updateOverlays = () => (this.overlaysLayer.style.transform = `translate(${this.data.offsetX}px, ${this.data.offsetY}px) scale(${this.data.scale})`);
 
@@ -119,14 +119,15 @@ export default class overlayManager {
 		overlay.style.setProperty('--active-color', color.active);
 		switch (type) {
 			case 'text':
-			case 'markdown':
+			case 'markdown': {
 				overlay.classList.add('markdown-content');
 				const parsedContentWrapper = document.createElement('div');
 				parsedContentWrapper.innerHTML = await marked.parse(content || '');
 				parsedContentWrapper.classList.add('parsed-content-wrapper');
 				overlay.appendChild(parsedContentWrapper);
 				break;
-			case 'link':
+			}
+			case 'link': {
 				const iframe = document.createElement('iframe');
 				iframe.src = content;
 				iframe.sandbox = 'allow-scripts allow-same-origin';
@@ -134,25 +135,29 @@ export default class overlayManager {
 				iframe.loading = 'lazy';
 				overlay.appendChild(iframe);
 				break;
-			case 'audio':
+			}
+			case 'audio': {
 				const audio = document.createElement('audio');
 				audio.className = 'audio';
 				audio.src = content;
 				audio.controls = true;
 				overlay.appendChild(audio);
 				break;
-			case 'image':
+			}
+			case 'image': {
 				const img = document.createElement('img');
 				img.src = content;
 				img.loading = 'lazy';
 				overlay.appendChild(img);
+			}
 		}
 		switch (type) {
 			case 'link':
-			case 'audio':
+			case 'audio': {
 				const clickLayer = document.createElement('div');
 				clickLayer.className = 'click-layer';
 				overlay.appendChild(clickLayer);
+			}
 		}
 		const overlayBorder = document.createElement('div');
 		overlayBorder.className = 'overlay-border';
@@ -172,12 +177,12 @@ export default class overlayManager {
 		return overlay;
 	}
 
-	private startInteract() {
+	private startInteract = () => {
 		for (const hook of this.registry.hooks.onInteractionStart) hook();
-	}
-	private endInteract() {
+	};
+	private endInteract = () => {
 		for (const hook of this.registry.hooks.onInteractionEnd) hook();
-	}
+	};
 
 	private dispose = () => {
 		while (this.overlaysLayer.firstElementChild) {
