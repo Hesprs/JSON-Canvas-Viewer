@@ -1,8 +1,8 @@
 # JSON Canvas Viewer
 
-![TypeScript](https://badgen.net/badge/-/Strict?icon=typescript&label=TypeScript&labelColor=blue&color=555555)
-[![npm](https://badgen.net/npm/v/json-canvas-viewer?icon=npm&labelColor=red&color=555555)](https://www.npmjs.com/package/json-canvas-viewer)
-[![publish size](https://badgen.net/packagephobia/publish/json-canvas-viewer?labelColor=green&color=555555)](https://packagephobia.now.sh/result?p=json-canvas-viewer)
+![TypeScript](https://img.shields.io/badge/Types-Strict-333333?logo=typescript&labelColor=blue&logoColor=white)
+[![npm](https://img.shields.io/npm/v/json-canvas-viewer?logo=npm&labelColor=red&logoColor=white&color=333333)](https://www.npmjs.com/package/json-canvas-viewer)
+[![publish size](https://img.shields.io/bundlephobia/min/json-canvas-viewer?style=flat&logo=webpack&labelColor=00b554&logoColor=white&color=333333&label=Minified%20Size)](https://bundlephobia.com/package/json-canvas-viewer)
 
 ![Canvas Viewer](example/preview.png)
 
@@ -41,19 +41,35 @@ Instantiate the viewer:
 <div id="myCanvasContainer" style="width:800px; height:600px;"></div>
 <script type="module">
     import canvasViewer from 'json-canvas-viewer';
-    const viewer = new canvasViewer(document.getElementById('myCanvasContainer'));
+    import minimap from 'json-canvas-viewer/minimap'
+
+    const viewer = new canvasViewer(document.getElementById('myCanvasContainer'), {
+		extensions: [minimap], // use extensions
+		options: {
+			minimap: {
+				collapsed: true, // use options
+			},
+		},
+        hooks: {
+            onLoad: [(path) => console.log('Loading Canvas at ${path}!')] // register hooks
+        }
+	});
     viewer.loadCanvas('example/introduction.canvas');
-    // dispose when not needed
-    viewer.dispose();
+
+    console.log(viewer.registry.api.dataManager.middleViewer()); // use APIs
+
+    viewer.dispose(); // dispose when not needed
 </script>
 ```
 
 And the viewer should be right in your container, you can instantiate the viewer multiple times to render multiple canvases simultaneously.
 
-**Methods**:
+**Public Methods & Registry**:
 
-- `loadCanvas(path)` — Load a canvas file (by path), **please put all the related files (files embedded in the canvas) in the same folder as the canvas file, wherever they originally are**.
-- `dispose()` — Clean up and remove viewer from DOM.
+- `viewer.loadCanvas(path)` - Load a canvas file (by path), **please put all the related files (files embedded in the canvas) in the same folder as the canvas file, wherever they originally are**.
+- `viewer.dispose()` - Clean up and remove viewer from DOM.
+- `viewer.registry` - access `registry` (covered later).
+
 
 ## 🐶 Features
 
@@ -94,21 +110,23 @@ interface Class<T> { new (...args: any[]): T }
 interface Function { (...args: any[]): any }
 ```
 
-The second parameter of the constructor is an object which is then merged with the default registry. You can also manually register using the `register` method.
+The second parameter of the constructor is an object which is then merged with the default registry. You can also manually register using the `registry.register` method.
 
 **Default Options and Values**:
 
 ```TypeScript
-{
-    main: {
-        noShadow: false,
-    },
-    interactor: {
-        preventDefault: true,
-        proControlSchema: false,
-        zoomFactor: 0.002,
-        lockControlSchema: false,
-	},
+registry: {
+    options: {
+        main: {
+            noShadow: false,
+        },
+        interactor: {
+            preventDefault: true,
+            proControlSchema: false,
+            zoomFactor: 0.002,
+            lockControlSchema: false,
+	    },
+    }
 }
 ```
 
@@ -121,15 +139,16 @@ The second parameter of the constructor is an object which is then merged with t
 **Default Hooks**:
 
 ```TypeScript
-{
-    onDispose: [],
-    onRender: [],
-    onResize: [(width: number, height: number) => {}],
-    onClick: [(id: string | null) => {}],
-    onZoom: [],
-    onToggleFullscreen: [],
-    onInteractionStart: [],
-    onInteractionEnd: [],
+registry: {
+    hooks: {
+        onDispose: [],
+        onRender: [],
+        onResize: [(width: number, height: number) => {}],
+        onClick: [(id: string | null) => {}],
+        onToggleFullscreen: [],
+        onInteractionStart: [],
+        onInteractionEnd: [],
+    }
 }
 ```
 
@@ -140,7 +159,6 @@ The second parameter of the constructor is an object which is then merged with t
   - `height` — The height of the resized viewer container.
 - `onClick` — Called when the canvas is clicked.
   - `id` — The id of the node that is clicked, or `null` if no node is clicked.
-- `onZoom` — Called when the zoom level changes.
 - `onToggleFullscreen` — Called when the fullscreen mode is toggled.
 - `onInteractionStart` — Called when the pointer enters a selected node.
 - `onInteractionEnd` — Called when the pointer leaves a selected node.
@@ -148,30 +166,33 @@ The second parameter of the constructor is an object which is then merged with t
 **Default API**:
 
 ```TypeScript
-{
-    main: {
-        loadCanvas: (path: string) => Promise<void>,
-        refresh: () => void, // Manually trigger a render
-        pan: (x: number, y: number) => void,
-        zoom: (factor: number, origin: Coordinates) => void,
-        zoomToScale: (newScale: number, origin: Coordinates) => void,
-        panToCoords: (x: number, y: number) => void,
-        shiftFullscreen: (option: 'toggle' | 'enter' | 'exit' = 'toggle') => void,
-        resetView: () => void, // Reset the scale and offset to default that the whole canvas is visible
-    },
-    dataManager: {
-        middleViewer: () => {
-            x: number; // half of the container width
-            y: number; // half of the container height
-            width: number; // container width
-            height: number; // container height
+registry: {
+    api: {
+        main: {
+            loadCanvas: (path: string) => Promise<void>, // same as viewer.loadCanvas
+            refresh: () => void, // Manually trigger a render
+            pan: (x: number, y: number) => void,
+            zoom: (factor: number, origin: Coordinates) => void,
+            zoomToScale: (newScale: number, origin: Coordinates) => void,
+            panToCoords: (x: number, y: number) => void,
+            shiftFullscreen: (option: 'toggle' | 'enter' | 'exit' = 'toggle') => void,
+            resetView: () => void, // Reset the scale and offset to default that the whole canvas is visible
         },
-        findNodeAtMousePosition: (mousePosition: Coordinates) => JSONCanvasNode | null,
-    },
-    interactionHandler: {
-        stop: () => void, // Stop receiving interaction
-        start: () => void, // Start receiving interaction
-    },
+        dataManager: {
+            middleViewer: () => {
+                x: number; // half of the container width
+                y: number; // half of the container height
+                width: number; // container width
+                height: number; // container height
+            },
+            findNodeAt: (mousePosition: Coordinates) => JSONCanvasNode | null,
+            applyStyles: (container: HTMLElement, styleString: string) => void, // add a <style> element containing styleString to container (used in extension development)
+        },
+        interactionHandler: {
+            stop: () => void, // Stop receiving interaction
+            start: () => void, // Start receiving interaction
+        },
+    }
 }
 ```
 
@@ -274,7 +295,7 @@ An extension, in essence, is a class that follows a fixed pattern. You can do al
 Here comes a minimal sample extension of a debug panel (JavaScript for simplicity):
 
 ```JavaScript
-import { round } from '../utilities';
+import style from './style.scss?inline';
 
 export default class debugPanel {
     constructor(data, registry) {
@@ -291,6 +312,7 @@ export default class debugPanel {
         });
         this.debugPanel = document.createElement('div');
         this.debugPanel.className = 'debug-panel';
+        registry.api.dataManager.applyStyles(this.debugPanel, style);
         this.data = data;
         data.container.appendChild(this.debugPanel);
     }
@@ -302,6 +324,11 @@ export default class debugPanel {
         `;
     };
 
+    private round = (roundedNum: number, digits: number) => {
+	    const factor = 10 ** digits;
+	    return Math.round(roundedNum * factor) / factor;
+    }
+
     private dispose = () => {
         this.debugPanel.remove();
         this.debugPanel = null;
@@ -309,9 +336,37 @@ export default class debugPanel {
 }
 ```
 
-## 📂 Canvas File Structure
+## 💻 Development
 
-The viewer expects JSON Canvas files in JSON format (a combination of official [JSON Canvas spec](https://jsoncanvas.org/spec/1.0/) and [Developer-Mike/obsidian-advanced-canvas spec](https://github.com/Developer-Mike/obsidian-advanced-canvas)):
+Built with `TypeScript`, `SCSS` and `HTML5 Canvas`.
+
+**Project Structure**:
+
+```
+root
+├── src/
+│   ├── extensions/
+│   │   ├── controls/              // Control panel
+│   │   ├── minimap/               // Minimap extension
+│   │   ├── mistouchPreventer/     // MistouchPrevention extension
+│   │   └── debugPanel/            // Debug panel
+│   ├── canvasViewer.ts            // Main entry point
+│   ├── interactor.ts              // Handles pointer events for user pan/zoom
+│   ├── dataManager.ts             // Manages canvas data
+│   ├── interactionHandler.ts      // Handles interaction events (wrapper of interactor)
+│   ├── overlayManager.ts          // Renderer for interactive nodes
+│   ├── renderer.ts                // Renderer for non-interactive stuff
+│   ├── declarations.d.ts          // Public types
+│   ├── utilities.ts               // Utility functions
+│   └── styles.scss                // Main styles for the viewer
+└── example/
+    ├── index.html                 // Example/test entry point
+    └── Example Canvas/            // Example/test canvas file
+```
+
+**Canvas File Structure**:
+
+The viewer expects JSON Canvas files in JSON format (a combination of official [JSON Canvas](https://jsoncanvas.org/spec/1.0/) spec and [Developer-Mike/obsidian-advanced-canvas](https://github.com/Developer-Mike/obsidian-advanced-canvas) spec):
 
 ```TypeScript
 interface JSONCanvas {
@@ -352,34 +407,6 @@ interface JSONCanvasEdge {
     styleAttributes?: Record<string, string>;
     color?: string;
 }
-```
-
-## 💻 Development
-
-Built with `TypeScript`, `SCSS` and `HTML5 Canvas`.
-
-**Project Structure**:
-
-```
-root
-├── src/
-│   ├── extensions/
-│   │   ├── controls.ts            // Control panel
-│   │   ├── minimap.ts             // Minimap extension
-│   │   ├── mistouchPreventer.ts   // MistouchPrevention extension
-│   │   └── debugPanel.ts          // Debug panel
-│   ├── canvasViewer.ts            // Main entry point
-│   ├── interactor.ts              // Handles pointer events for user pan/zoom
-│   ├── dataManager.ts             // Manages canvas data
-│   ├── interactionHandler.ts      // Handles interaction events (wrapper of interactor)
-│   ├── overlayManager.ts          // Renderer for interactive nodes
-│   ├── renderer.ts                // Renderer for non-interactive stuff
-│   ├── declarations.d.ts          // Public types
-│   ├── utilities.ts               // Utility functions
-│   └── styles.scss                // Styles for the viewer
-└── example/
-    ├── index.html                 // Example/test entry point
-    └── Example Canvas/            // Example/test canvas file
 ```
 
 ## 📝 Copyright & License

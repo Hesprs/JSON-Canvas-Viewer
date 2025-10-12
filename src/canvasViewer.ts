@@ -1,5 +1,5 @@
 import { deepMerge } from './utilities';
-import styles from './styles.scss?inline';
+import style from './styles.scss?inline';
 import dataManager from './dataManager';
 import interactionHandler from './interactionHandler';
 import overlayManager from './overlayManager';
@@ -49,7 +49,7 @@ export default class canvasViewer {
 		},
 		container: document.createElement('div'),
 	};
-	private registry: registry = {
+	registry: registry = {
 		options: {},
 		extensions: [dataManager, renderer, interactionHandler, overlayManager],
 		hooks: {},
@@ -86,19 +86,14 @@ export default class canvasViewer {
 		while (container.firstElementChild) container.firstElementChild.remove();
 		container.innerHTML = '';
 
-		const style = document.createElement('style');
-		style.innerHTML = styles;
-		let realContainer: HTMLElement | ShadowRoot;
+		const realContainer = this.registry.options.main.noShadow ? container: container.attachShadow({ mode: 'open' });
 
-		if (this.registry.options.main.noShadow) realContainer = container;
-		else realContainer = container.attachShadow({ mode: 'open' });
+		for (const extension of this.registry.extensions) new extension(this.data, this.registry);
+		this.resizeObserver = new ResizeObserver(this.onResize);
+		this.registry.api.dataManager.applyStyles(realContainer, style);
 
-		realContainer.appendChild(style);
 		this.data.container.classList.add('container');
 		realContainer.appendChild(this.data.container);
-
-		this.resizeObserver = new ResizeObserver(this.onResize);
-		for (const extension of this.registry.extensions) new extension(this.data, this.registry);
 	}
 
 	private draw = () => {

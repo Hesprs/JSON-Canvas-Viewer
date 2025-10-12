@@ -2,15 +2,19 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import terser from '@rollup/plugin-terser';
-import { readdirSync } from 'fs';
+import { readdirSync, existsSync } from 'fs';
 
 // Auto-detect entry points from src directory
 const srcDir = resolve(__dirname, 'src', 'extensions');
-const extensions = readdirSync(srcDir)
-	.filter(file => file.endsWith('.ts') || file.endsWith('.js'))
-	.reduce((entries, file) => {
-		const name = file.replace(/\.(ts|js)$/, '');
-		entries[name] = resolve(srcDir, file);
+const extensions = readdirSync(srcDir, { withFileTypes: true })
+	.filter(entry => entry.isDirectory())
+	.map(dir => {
+		const indexPath = resolve(srcDir, dir.name, 'index.ts');
+		if (existsSync(indexPath)) return { [dir.name]: indexPath };
+		else return { [dir.name]: resolve(srcDir, dir.name) };
+	})
+	.reduce((entries, entry) => {
+		Object.assign(entries, entry);
 		return entries;
 	}, {} as Record<string, string>);
 
@@ -37,12 +41,7 @@ export default defineConfig({
 		rollupOptions: {
 			external: ['marked'],
 			output: {
-				entryFileNames: ({ name }) => {
-					if (name === 'index') {
-						return '[format]/index.js';
-					}
-					return '[format]/[name].js';
-				},
+				entryFileNames: '[format]/[name].js',
 				plugins: [terser()],
 			},
 		},

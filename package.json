@@ -1,6 +1,6 @@
 {
 	"name": "json-canvas-viewer",
-	"version": "3.1.0",
+	"version": "3.1.1",
 	"description": "A TypeScript-based viewer for JSON Canvas, easy to embed into websites.",
 	"type": "module",
 	"types": "dist/types/canvasViewer.d.ts",
@@ -13,26 +13,26 @@
 			"require": "./dist/cjs/index.js"
 		},
 		"./minimap": {
-			"types": "./dist/types/extensions/minimap.d.ts",
+			"types": "./dist/types/extensions/minimap/index.d.ts",
 			"import": "./dist/es/minimap.js",
 			"require": "./dist/cjs/minimap.js"
 		},
 		"./controls": {
-			"types": "./dist/types/extensions/controls.d.ts",
+			"types": "./dist/types/extensions/controls/index.d.ts",
 			"import": "./dist/es/controls.js",
 			"require": "./dist/cjs/controls.js"
 		},
 		"./mistouchPreventer": {
-			"types": "./dist/types/extensions/mistouchPreventer.d.ts",
+			"types": "./dist/types/extensions/mistouchPreventer/index.d.ts",
 			"import": "./dist/es/mistouchPreventer.js",
 			"require": "./dist/cjs/mistouchPreventer.js"
 		}
 	},
 	"typesVersions": {
 		"*": {
-			"minimap": ["dist/types/extensions/minimap.d.ts"],
-			"controls": ["dist/types/extensions/controls.d.ts"],
-			"mistouchPreventer": ["dist/types/extensions/mistouchPreventer.d.ts"]
+			"minimap": ["dist/types/extensions/minimap/index.d.ts"],
+			"controls": ["dist/types/extensions/controls/index.d.ts"],
+			"mistouchPreventer": ["dist/types/extensions/mistouchPreventer/index.d.ts"]
 		}
 	},
 	"repository": {

@@ -1,4 +1,5 @@
-import { getColor, drawRoundRect, getAnchorCoord, destroyError, resizeCanvasForDPR } from '../utilities';
+import { getColor, drawRoundRect, getAnchorCoord, destroyError, resizeCanvasForDPR } from '../../utilities';
+import style from './styles.scss?inline'
 
 export default class minimap {
 	private minimapCtx: CanvasRenderingContext2D;
@@ -48,6 +49,8 @@ export default class minimap {
 
 		this._minimapContainer = document.createElement('div');
 		this._minimapContainer.className = 'minimap-container';
+
+		registry.api.dataManager.applyStyles(this._minimapContainer, style);
 
 		this._toggleMinimapBtn = document.createElement('button');
 		this._toggleMinimapBtn.className = 'toggle-minimap collapse-button';

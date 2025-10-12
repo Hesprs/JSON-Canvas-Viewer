@@ -1,4 +1,5 @@
-import { destroyError } from '../utilities';
+import { destroyError } from '../../utilities';
+import style from './styles.scss?inline';
 
 export default class controls {
 	private _controlsPanel: HTMLDivElement | null;
@@ -9,6 +10,7 @@ export default class controls {
 	private _zoomInBtn: HTMLButtonElement | null;
 	private _resetViewBtn: HTMLButtonElement | null;
 	private registry: registry;
+	private data: runtimeData;
 
 	private get controlsPanel() {
 		if (this._controlsPanel === null) throw destroyError;
@@ -43,8 +45,8 @@ export default class controls {
 		registry.register({
 			hooks: {
 				onToggleFullscreen: [this.updateFullscreenBtn],
-				onZoom: [this.updateSlider],
-				onLoad: [this.updateSlider],
+				onRender: [this.updateSlider],
+				onDispose: [this.dispose],
 			},
 			options: {
 				controls: {
@@ -61,6 +63,8 @@ export default class controls {
 		this._controlsPanel = document.createElement('div');
 		this._controlsPanel.className = 'controls';
 		this._controlsPanel.classList.toggle('collapsed', registry.options.controls.collapsed);
+
+		registry.api.dataManager.applyStyles(this._controlsPanel, style);
 
 		this._toggleCollapseBtn = document.createElement('button');
 		this._toggleCollapseBtn.className = 'collapse-button';
@@ -99,6 +103,7 @@ export default class controls {
 		data.container.appendChild(this._controlsPanel);
 
 		this.registry = registry;
+		this.data = data;
 
 		this._toggleCollapseBtn.addEventListener('click', this.toggleCollapse);
 		this._zoomInBtn.addEventListener('click', this.zoomIn);
@@ -118,7 +123,7 @@ export default class controls {
 		else this.toggleFullscreenBtn.innerHTML = `<svg viewBox="-5.28 -5.28 34.56 34.56" fill="none"><path d="M4 9V5.6c0-.56 0-.84.109-1.054a1 1 0 0 1 .437-.437C4.76 4 5.04 4 5.6 4H9M4 15v3.4c0 .56 0 .84.109 1.054a1 1 0 0 0 .437.437C4.76 20 5.04 20 5.6 20H9m6-16h3.4c.56 0 .84 0 1.054.109a1 1 0 0 1 .437.437C20 4.76 20 5.04 20 5.6V9m0 6v3.4c0 .56 0 .84-.109 1.054a1 1 0 0 1-.437.437C19.24 20 18.96 20 18.4 20H15" stroke-width="2.4" stroke-linecap="round"/></svg>`;
 	}
 
-	private updateSlider = (scale: number) => (this.zoomSlider.value = String(this.scaleToSlider(scale)));
+	private updateSlider = () => (this.zoomSlider.value = String(this.scaleToSlider(this.data.scale)));
 	private scaleToSlider = (scale: number) => Math.log(scale) / Math.log(1.1);
 
 	private dispose = () => {

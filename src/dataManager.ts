@@ -2,7 +2,6 @@ import { unexpectedError } from './utilities';
 
 const GRID_CELL_SIZE = 800;
 const INITIAL_VIEWPORT_PADDING = 100;
-const RESISTANCE = 40;
 
 export default class dataManager {
 	data: runtimeData;
@@ -33,7 +32,8 @@ export default class dataManager {
 				},
 				dataManager: {
 					middleViewer: this.middleViewer,
-					findNodeAtMousePosition: this.findNodeAtMousePosition,
+					findNodeAt: this.findNodeAt,
+					applyStyles: this.applyStyles,
 				},
 			},
 			hooks: {
@@ -66,7 +66,7 @@ export default class dataManager {
 		}
 	};
 
-	private findNodeAtMousePosition = ({ x: mouseX, y: mouseY }: Coordinates) => {
+	private findNodeAt = ({ x: mouseX, y: mouseY }: Coordinates) => {
 		const { x, y } = this.C2W(this.C2C({ x: mouseX, y: mouseY }));
 		let candidates: Array<JSONCanvasNode> = [];
 		if (!this.spatialGrid) candidates = this.data.canvasData.nodes;
@@ -148,7 +148,6 @@ export default class dataManager {
 		this.data.offsetX = origin.x - (canvasCoords.x * validNewScale) / this.data.scale;
 		this.data.offsetY = origin.y - (canvasCoords.y * validNewScale) / this.data.scale;
 		this.data.scale = validNewScale;
-		for (const hook of this.registry.hooks.onZoom) hook(validNewScale);
 	};
 	private pan = ({ x, y }: Coordinates) => {
 		this.data.offsetX += x;
@@ -206,20 +205,11 @@ export default class dataManager {
 		};
 	};
 
-	private animator = () => {
-		if (this.acceleration.pan.x !== 0 || this.acceleration.pan.y !== 0 || this.acceleration.zoom !== 0) {
-			this.data.offsetX += this.acceleration.pan.x;
-			this.data.offsetY += this.acceleration.pan.y;
-			this.data.scale *= this.acceleration.zoom;
-			if (this.acceleration.pan.x >= RESISTANCE) this.acceleration.pan.x -= RESISTANCE;
-			else this.acceleration.pan.x = 0;
-			if (this.acceleration.pan.y >= RESISTANCE) this.acceleration.pan.y -= RESISTANCE;
-			else this.acceleration.pan.y = 0;
-			if (this.acceleration.zoom >= RESISTANCE) this.acceleration.zoom -= RESISTANCE;
-			else this.acceleration.zoom = 1;
-		}
-		this.animationId = requestAnimationFrame(this.animator);
-	};
+	private applyStyles = (container: HTMLElement, styleString: string) => {
+		const style = document.createElement('style');
+		style.innerHTML = styleString;
+		container.appendChild(style);
+	}
 
 	private dispose = () => {
 		if (this.animationId) cancelAnimationFrame(this.animationId);

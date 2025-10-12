@@ -1,0 +1,23 @@
+@use "../../styles";
+
+.prevention-container {
+	@extend .full;
+	@extend .flex-center;
+	overflow: visible;
+	transition: background 200ms, opacity 200ms, box-shadow 200ms, border 200ms, filter 200ms, backdrop-filter 200ms;
+	&.hidden {
+		pointer-events: none;
+	}
+	.prevention-banner {
+		background: rgba(0, 0, 0, 0.4);
+		border-radius: 12px;
+		padding: 12px;
+		margin: 12px;
+		backdrop-filter: blur(8px) saturate(1.5);
+		border: 2px solid rgba(140, 140, 140, 0.75);
+		color: #fff;
+		font-size: calc(14px + 0.3vw);
+		line-height: calc(17px + 0.3vw);
+		text-align: center;
+	}
+}

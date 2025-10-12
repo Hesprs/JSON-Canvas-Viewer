@@ -1,4 +1,5 @@
-import { destroyError, round } from '../utilities';
+import { destroyError, round } from '../../utilities';
+import style from './styles.scss?inline'
 
 export default class debugPanel {
     private _debugPanel: HTMLDivElement | null;
@@ -23,6 +24,7 @@ export default class debugPanel {
         });
         this._debugPanel = document.createElement('div');
         this._debugPanel.className = 'debug-panel';
+        registry.api.dataManager.applyStyles(this._debugPanel, style);
         this.data = data;
         data.container.appendChild(this._debugPanel);
     }

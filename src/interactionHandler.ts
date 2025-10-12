@@ -54,7 +54,7 @@ export default class interactionHandler {
 		}
 		if (e instanceof CustomEvent) {
 			if (isUIControl(e.detail.target)) return;
-			const node = this.registry.api.dataManager.findNodeAtMousePosition(e.detail.position);
+			const node = this.registry.api.dataManager.findNodeAt(e.detail.position);
 			for (const hook of this.registry.hooks.onClick) hook(node?.id || null);
 		}
 	};

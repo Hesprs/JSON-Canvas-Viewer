@@ -1,0 +1,84 @@
+.collapse-button {
+	border-radius: 8px;
+	transition: transform 200ms;
+	&:hover {
+		background: rgba(68, 68, 68, 0.8);
+	}
+}
+
+button {
+	cursor: pointer;
+	font-size: 18px;
+	height: 32px;
+	border: none;
+	transition: var(--containerTransition);
+	text-align: center;
+	background-color: #444;
+	width: 32px;
+	padding: 5px 0px;
+	svg {
+		width: 100%;
+		height: 100%;
+	}
+}
+
+.minimap-container {
+	position: absolute;
+	bottom: 10px;
+	right: 10px;
+	display: flex;
+	pointer-events: none;
+	transition: transform 200ms;
+	&.collapsed {
+		transform: translateX(calc(100% - 32px));
+	}
+	@media (max-width: 768px) {
+		transform: translateY(60px) translateX(80px);
+		&.collapsed {
+			transform: translateY(60px) translateX(calc(100% - 32px));
+		}
+	}
+}
+
+.toggle-minimap {
+	margin: auto 10px 0 0;
+	pointer-events: auto;
+	.collapsed & {
+		transform: rotate(180deg);
+	}
+	@media (max-width: 768px) {
+		transform: translateY(-60px);
+		.collapsed & {
+			transform: translateY(-60px) rotate(180deg);
+		}
+	}
+}
+
+.minimap {
+	position: relative;
+	width: 200px;
+	height: 150px;
+	overflow: hidden;
+	border-radius: 12px;
+	background: rgba(32, 32, 32);
+	backdrop-filter: blur(8px) saturate(1.5);
+	border: 2px solid rgba(140, 140, 140, 0.75);
+	transform-origin: 0 0;
+	@media (max-width: 768px) {
+		transform: scale(0.6);
+	}
+	.minimap-canvas {
+		width: 100%;
+		height: 100%;
+	}
+	.viewport-rectangle {
+		position: absolute;
+		top: 0;
+		left: 0;
+		pointer-events: none;
+		border: 2px solid #fff;
+		border-radius: 6px;
+		box-sizing: border-box;
+		background: transparent;
+	}
+}

@@ -1,4 +1,5 @@
-import { destroyError } from '../utilities';
+import { destroyError } from '../../utilities';
+import style from './styles.scss?inline'
 
 export default class mistouchPreventer {
 	private _preventionContainer: HTMLDivElement | null;
@@ -30,6 +31,9 @@ export default class mistouchPreventer {
 		});
 		this._preventionContainer = document.createElement('div');
 		this._preventionContainer.className = 'prevention-container hidden';
+
+		registry.api.dataManager.applyStyles(this._preventionContainer, style);
+
 		const preventionBanner = document.createElement('div');
 		preventionBanner.className = 'prevention-banner';
 		preventionBanner.innerHTML = 'Frozen to prevent mistouch, click on to unlock.';
