@@ -169,32 +169,50 @@ registry: {
 registry: {
     api: {
         main: {
-            loadCanvas: (path: string) => Promise<void>, // same as viewer.loadCanvas
-            refresh: () => void, // Manually trigger a render
+            loadCanvas: (path: string) => Promise<void>,
+            refresh: () => void,
             pan: (x: number, y: number) => void,
             zoom: (factor: number, origin: Coordinates) => void,
             zoomToScale: (newScale: number, origin: Coordinates) => void,
             panToCoords: (x: number, y: number) => void,
             shiftFullscreen: (option: 'toggle' | 'enter' | 'exit' = 'toggle') => void,
-            resetView: () => void, // Reset the scale and offset to default that the whole canvas is visible
+            resetView: () => void,
         },
         dataManager: {
             middleViewer: () => {
-                x: number; // half of the container width
-                y: number; // half of the container height
-                width: number; // container width
-                height: number; // container height
+                x: number;
+                y: number;
+                width: number;
+                height: number;
             },
             findNodeAt: (mousePosition: Coordinates) => JSONCanvasNode | null,
-            applyStyles: (container: HTMLElement, styleString: string) => void, // add a <style> element containing styleString to container (used in extension development)
+            applyStyles: (container: HTMLElement, styleString: string) => void,
         },
         interactionHandler: {
-            stop: () => void, // Stop receiving interaction
-            start: () => void, // Start receiving interaction
+            stop: () => void,
+            start: () => void,
         },
     }
 }
 ```
+
+- `main.loadCanvas` - Same as viewer.loadCanvas.
+- `main.refresh` - Manually trigger a render.
+- `main.pan` - Pan the canvas by x and y distance.
+- `main.zoom` - Zoom the canvas by a factor.
+- `main.zoomToScale` - Zoom to a specific scale.
+- `main.panToCoords` - Pan to a specific coordinate (word coordinate).
+- `main.shiftFullscreen` - Enter/exit fullscreen.
+- `main.resetView` - Reset the scale and offset to default that the whole canvas is visible.
+- `dataManager.middleViewer` - Returns the dimensions of the viewer container element.
+  - `x` - Half of the container width.
+  - `y` - Half of the container height.
+  - `width` - Container width.
+  - `height` - Container height.
+- `dataManager.findNodeAt` - Find the node at the given position (word coordinate).
+- `dataManager.applyStyles` - Add a `<style>` element containing styleString to container (used in extension development).
+- `interactionHandler.stop` - Stop receiving pan/zoom/click interaction.
+- `interactionHandler.start` - Start receiving pan/zoom/click interaction.
 
 ### Extensions
 
@@ -292,6 +310,43 @@ An extension, in essence, is a class that follows a fixed pattern. You can do al
 - receive `runtimeData` and `registry` as parameters in the constructor.
 - calls `registry.register` first in the constructor to define default options, register hooks and provide API.
 
+**Runtime Data**:
+
+```TypeScript
+interface runtimeData {
+    offsetX: number;
+    offsetY: number;
+    scale: number;
+    canvasData: JSONCanvas;
+    nodeMap: Record<string, JSONCanvasNode>;
+    canvasBaseDir: string;
+    nodeBounds: nodeBounds;
+    container: HTMLDivElement;
+}
+
+interface nodeBounds {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    width: number;
+    height: number;
+    centerX: number;
+    centerY: number;
+}
+```
+
+- `offsetX` - The x offset of the canvas in viewport (word coordinate).
+- `offsetY` - The y offset of the canvas in viewport (word coordinate).
+- `scale` - The scale of the canvas in viewport.
+- `canvasData` - The canvas data (see § Canvas File Structure).
+- `nodeMap` - Remap canvas nodes with their ids.
+- `canvasBaseDir` - The base directory of the canvas file.
+- `nodeBounds` - The bounds of all the canvas nodes (word coordinate).
+- `container` - The container of the canvas.
+
+**Example**:
+
 Here comes a minimal sample extension of a debug panel (JavaScript for simplicity):
 
 ```JavaScript
@@ -324,7 +379,7 @@ export default class debugPanel {
         `;
     };
 
-    private round = (roundedNum: number, digits: number) => {
+    private round = (roundedNum, digits) => {
 	    const factor = 10 ** digits;
 	    return Math.round(roundedNum * factor) / factor;
     }
