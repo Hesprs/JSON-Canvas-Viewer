@@ -32,7 +32,7 @@ export default defineConfig({
 		minify: 'esbuild',
 		lib: {
 			entry: {
-				index: resolve(__dirname, 'src', 'canvasViewer.ts'),
+				index: resolve(__dirname, 'src', 'main.ts'),
 				...extensions,
 			},
 			name: 'canvasViewer',

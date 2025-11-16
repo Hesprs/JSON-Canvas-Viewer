@@ -51,7 +51,7 @@ Instantiate the viewer:
 			},
 		},
         hooks: {
-            onLoad: [(path) => console.log('Loading Canvas at ${path}!')] // register hooks
+            onLoad: [(path) => console.log(`Loading Canvas at ${path}!`)] // register hooks
         }
 	});
     viewer.loadCanvas('example/introduction.canvas');
@@ -416,7 +416,7 @@ root
 │   └── styles.scss                // Main styles for the viewer
 └── example/
     ├── index.html                 // Example/test entry point
-    └── Example Canvas/            // Example/test canvas file
+    └── Example Canvas/            // Example/test canvas folder
 ```
 
 **Canvas File Structure**:

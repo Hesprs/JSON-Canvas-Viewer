@@ -1,12 +1,26 @@
-export const unexpectedError = new Error('This error is unexpected, probably caused by canvas file corruption. If you assure the error is not by accident, please contact the developer and show how to reproduce.');
-export const destroyError = new Error("Resource hasn't been set up or has been disposed.");
+import { api } from 'omnikernel';
+import { unexpectedError } from './shared';
 
-export interface RuntimeJSONCanvasNode extends JSONCanvasNode {
-	mdContent?: string;
-	mdFrontmatter?: Record<string, string>;
+export default function Utilities(Kernel: Amoeba) {
+	Kernel._register({
+		utilities: {
+			round: api(round),
+			resizeCanvasForDPR: api(resizeCanvasForDPR),
+			applyStyles: api(applyStyles),
+			drawRoundRect: api(drawRoundRect),
+			getAnchorCoord: api(getAnchorCoord),
+			getColor: api(getColor)
+		},
+	});
 }
 
-export function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+function applyStyles(container: HTMLElement, styleString: string) {
+	const style = document.createElement('style');
+	style.innerHTML = styleString;
+	container.appendChild(style);
+}
+
+function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
 	ctx.beginPath();
 	ctx.moveTo(x + radius, y);
 	ctx.lineTo(x + width - radius, y);
@@ -20,7 +34,7 @@ export function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: numbe
 	ctx.closePath();
 }
 
-export function getAnchorCoord(node: JSONCanvasNode, side: 'top' | 'bottom' | 'left' | 'right') {
+function getAnchorCoord(node: JSONCanvasNode, side: 'top' | 'bottom' | 'left' | 'right') {
 	const midX = node.x + node.width / 2;
 	const midY = node.y + node.height / 2;
 	switch (side) {
@@ -37,7 +51,7 @@ export function getAnchorCoord(node: JSONCanvasNode, side: 'top' | 'bottom' | 'l
 	}
 }
 
-export function getColor(colorIndex: string = '0') {
+function getColor(colorIndex: string = '0') {
 	let themeColor = null;
 
 	function hexToRgb(hex: string) {
@@ -82,7 +96,7 @@ export function getColor(colorIndex: string = '0') {
 	};
 }
 
-export function resizeCanvasForDPR(canvas: HTMLCanvasElement, width: number, height: number) {
+function resizeCanvasForDPR(canvas: HTMLCanvasElement, width: number, height: number) {
 	const dpr = window.devicePixelRatio || 1;
 	const ctx = canvas.getContext('2d');
 	if (!ctx) throw unexpectedError;
@@ -92,33 +106,7 @@ export function resizeCanvasForDPR(canvas: HTMLCanvasElement, width: number, hei
 	ctx.scale(dpr, dpr);
 }
 
-export function deepMerge<T extends Record<string, any>>(main: T, toMerge: Record<string, any>, passive: boolean = false): void {
-	function isPlainObject(obj: any): boolean {
-		return obj !== null && typeof obj === 'object' && Object.prototype.toString.call(obj) === '[object Object]';
-	}
-	// Validate main object
-	if (main === null || typeof main !== 'object') throw new Error('Main must be a non-null object');
-	if (toMerge === null || typeof toMerge !== 'object') throw new Error('Nothing to merge');
-
-	// Process all own enumerable properties of toMerge
-	const keys = Object.keys(toMerge);
-	for (const key of keys) {
-		const value = toMerge[key];
-
-		// Check if main has this property
-		if (key in main) {
-			const mainValue = main[key];
-
-			// Only merge if BOTH values are plain objects
-			if (isPlainObject(mainValue) && isPlainObject(value)) deepMerge(mainValue as Record<string, any>, value, passive);
-			else if (!passive) (main as Record<string, any>)[key] = value;
-		}
-		// New property - add directly
-		else (main as Record<string, any>)[key] = value;
-	}
-}
-
-export function round(roundedNum: number, digits: number) {
+function round(roundedNum: number, digits: number) {
 	const factor = 10 ** digits;
 	return Math.round(roundedNum * factor) / factor;
 }

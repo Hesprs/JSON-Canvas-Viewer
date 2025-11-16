@@ -1,51 +1,52 @@
 import interactor from './interactor';
+import { hook, normalize, api } from 'omnikernel';
 
-export default class interactionHandler {
+export default class InteractionHandler {
 	private interactor: interactor;
-	private registry: registry;
+	private Kernel;
 
-	constructor(data: runtimeData, registry: registry) {
-		registry.register({
-			hooks: {
-				onLoad: [this.onLoad],
-				onDispose: [this.dispose],
-				onInteractionStart: [this.stop],
-				onInteractionEnd: [this.start],
-			},
-			options: {
-				interactor: {
+	constructor(Kernel: Amoeba) {
+		Kernel._register({
+			main: {
+				options: {
 					preventDefault: true,
 					proControlSchema: false,
 					zoomFactor: 0.002,
 					lockControlSchema: false,
 				},
 			},
-			api: {
-				interactionHandler: {
-					stop: this.stop,
-					start: this.start,
+		});
+		this.interactor = new interactor(Kernel.data.container(), normalize(Kernel.main.options));
+		Kernel._register({
+			main: {
+				hooks: {
+					onInteractionStart: this.interactor.stop,
+					onInteractionEnd: this.interactor.start,
+					onLoaded: this.start,
+					onClick: hook(),
+				},
+				api: {
+					stopInteraction: api(this.interactor.stop),
+					startInteraction: api(this.interactor.start),
 				},
 			},
+			dispose: this.dispose,
 		});
-		this.interactor = new interactor(data.container, registry.options.interactor);
-		this.registry = registry;
+		this.Kernel = Kernel;
 	}
-
-	private stop = () => this.interactor.stop();
-	private start = () => this.interactor.start();
-
-	private onLoad = () => {
+	
+	private start = () => {
 		this.interactor.addEventListener('pan', this.onPan);
 		this.interactor.addEventListener('zoom', this.onZoom);
 		this.interactor.addEventListener('trueClick', this.onClick);
-		this.start();
+		this.interactor.start();
 	};
 
 	private onPan = (event: Event) => {
-		if (event instanceof CustomEvent) this.registry.api.main.pan(event.detail);
+		if (event instanceof CustomEvent) this.Kernel.main.api.pan(event.detail);
 	};
 	private onZoom = (event: Event) => {
-		if (event instanceof CustomEvent) this.registry.api.main.zoom(event.detail.factor, event.detail.origin);
+		if (event instanceof CustomEvent) this.Kernel.main.api.zoom(event.detail.factor, event.detail.origin);
 	};
 
 	private onClick = (e: Event) => {
@@ -54,8 +55,8 @@ export default class interactionHandler {
 		}
 		if (e instanceof CustomEvent) {
 			if (isUIControl(e.detail.target)) return;
-			const node = this.registry.api.dataManager.findNodeAt(e.detail.position);
-			for (const hook of this.registry.hooks.onClick) hook(node?.id || null);
+			const node = this.Kernel.utilities.findNodeAt(e.detail.position);
+			this.Kernel.main.hooks.onClick(node ? node.id : null);
 		}
 	};
 

@@ -1,44 +1,39 @@
-import { destroyError } from '../../utilities';
-import style from './styles.scss?inline'
+import { destroyError } from '../../shared';
+import { api } from 'omnikernel';
+import style from './styles.scss?inline';
 
 export default class mistouchPreventer {
 	private _preventionContainer: HTMLDivElement | null;
 	private preventMt: boolean = false;
 	private preventMistouch: { record: boolean; lastX: number; lastY: number; initialX: number; initialY: number };
-	private data: runtimeData;
+	private Kernel: Amoeba;
 
 	private get preventionContainer() {
 		if (this._preventionContainer === null) throw destroyError;
 		return this._preventionContainer;
 	}
 
-	constructor(data: runtimeData, registry: registry) {
-		registry.register({
-			hooks: {
-				onDispose: [this.dispose],
+	constructor(Kernel: Amoeba) {
+		Kernel._register({
+			mistouchPreventer: {
+				startPrevention: api(this.startPrevention),
+				endPrevention: api(this.endPrevention),
+				tipText: 'Frozen to prevent mistouch, click on to unlock.',
+				preventAtStart: true,
 			},
-			options: {
-				mistouchPreventer: {
-					preventAtStart: true,
-				},
-			},
-			api: {
-				mistouchPreventer: {
-					startPrevention: this.startPrevention,
-					endPrevention: this.endPrevention,
-				},
-			},
+			dispose: this.dispose,
 		});
+		this.Kernel = Kernel;
 		this._preventionContainer = document.createElement('div');
 		this._preventionContainer.className = 'prevention-container hidden';
 
-		registry.api.dataManager.applyStyles(this._preventionContainer, style);
+		Kernel.utilities.applyStyles(this._preventionContainer, style);
 
 		const preventionBanner = document.createElement('div');
 		preventionBanner.className = 'prevention-banner';
-		preventionBanner.innerHTML = 'Frozen to prevent mistouch, click on to unlock.';
+		preventionBanner.innerHTML = Kernel.mistouchPreventer.tipText();
 		this._preventionContainer.appendChild(preventionBanner);
-		data.container.appendChild(this._preventionContainer);
+		Kernel.data.container().appendChild(this._preventionContainer);
 		this.preventMistouch = {
 			record: false,
 			lastX: 0,
@@ -47,8 +42,7 @@ export default class mistouchPreventer {
 			initialY: 0,
 		};
 
-		if (registry.options.mistouchPreventer.preventAtStart) this.startPrevention();
-		this.data = data;
+		if (Kernel.mistouchPreventer.preventAtStart) this.startPrevention();
 
 		window.addEventListener('pointerdown', this.onPointerDown);
 		window.addEventListener('pointermove', this.onPointerMove);
@@ -56,7 +50,7 @@ export default class mistouchPreventer {
 	}
 
 	private onPointerDown = (e: PointerEvent) => {
-		const bounds = this.data.container.getBoundingClientRect();
+		const bounds = this.Kernel.data.container().getBoundingClientRect();
 		if (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom) {
 			if (!this.preventMt) this.startPrevention();
 		} else if (this.preventMt) {
@@ -84,15 +78,15 @@ export default class mistouchPreventer {
 
 	private startPrevention = () => {
 		this.preventionContainer.classList.remove('hidden');
-		this.data.container.classList.add('numb');
+		this.Kernel.data.container().classList.add('numb');
 		this.preventMt = true;
-	}
+	};
 
 	private endPrevention = () => {
 		this.preventMt = false;
 		this.preventionContainer.classList.add('hidden');
-		setTimeout(() => this.data.container.classList.remove('numb'), 50); // minimum delay to prevent triggering undesired button touch
-	}
+		setTimeout(() => this.Kernel.data.container().classList.remove('numb'), 50); // minimum delay to prevent triggering undesired button touch
+	};
 
 	private dispose = () => {
 		window.removeEventListener('pointerdown', this.onPointerDown);
@@ -100,5 +94,5 @@ export default class mistouchPreventer {
 		window.removeEventListener('pointerup', this.onPointerUp);
 		this.preventionContainer.remove();
 		this._preventionContainer = null;
-	}
+	};
 }

@@ -1,6 +1,6 @@
 {
 	"name": "json-canvas-viewer",
-	"version": "3.1.1",
+	"version": "3.2.0",
 	"description": "A TypeScript-based viewer for JSON Canvas, easy to embed into websites.",
 	"type": "module",
 	"types": "dist/types/canvasViewer.d.ts",
@@ -26,13 +26,27 @@
 			"types": "./dist/types/extensions/mistouchPreventer/index.d.ts",
 			"import": "./dist/es/mistouchPreventer.js",
 			"require": "./dist/cjs/mistouchPreventer.js"
+		},
+		"./debugPanel": {
+			"types": "./dist/types/extensions/debugPanel/index.d.ts",
+			"import": "./dist/es/debugPanel.js",
+			"require": "./dist/cjs/debugPanel.js"
 		}
 	},
 	"typesVersions": {
 		"*": {
-			"minimap": ["dist/types/extensions/minimap/index.d.ts"],
-			"controls": ["dist/types/extensions/controls/index.d.ts"],
-			"mistouchPreventer": ["dist/types/extensions/mistouchPreventer/index.d.ts"]
+			"minimap": [
+				"dist/types/extensions/minimap/index.d.ts"
+			],
+			"controls": [
+				"dist/types/extensions/controls/index.d.ts"
+			],
+			"mistouchPreventer": [
+				"dist/types/extensions/mistouchPreventer/index.d.ts"
+			],
+			"debugPanel": [
+				"dist/types/extensions/debugPanel/index.d.ts"
+			]
 		}
 	},
 	"repository": {
@@ -58,15 +72,15 @@
 	"license": "MIT",
 	"packageManager": "pnpm@10.15.1",
 	"devDependencies": {
-		"@eslint/js": "^9.36.0",
+		"@eslint/js": "^9.39.1",
 		"@rollup/plugin-terser": "^0.4.4",
-		"@types/node": "^24.2.1",
-		"eslint": "^9.32.0",
+		"@types/node": "^24.10.1",
+		"eslint": "^9.39.1",
 		"eslint-config-prettier": "^10.1.8",
-		"sass": "^1.90.0",
-		"typescript": "^5.9.2",
-		"typescript-eslint": "^8.45.0",
-		"vite": "^7.1.1"
+		"sass": "^1.94.0",
+		"typescript": "^5.9.3",
+		"typescript-eslint": "^8.46.4",
+		"vite": "^7.2.2"
 	},
 	"files": [
 		"dist"
@@ -78,9 +92,10 @@
 		"build": "vite build && pnpm run build-types"
 	},
 	"dependencies": {
-		"marked": "^16.1.2"
+		"marked": "^16.4.2",
+		"omnikernel": "file:/home/hesprs/Documents/Code/JSON-Canvas-Viewer/src/omnikernel-0.0.1.tgz"
 	},
 	"optionalDependencies": {
-		"marked-katex-extension": "^5.1.5"
+		"marked-katex-extension": "^5.1.6"
 	}
 }

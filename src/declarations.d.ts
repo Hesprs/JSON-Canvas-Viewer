@@ -43,8 +43,12 @@ declare global {
 		y: number;
 	}
 
-	interface Class<T> { new (...args: any[]): T }
-	interface Function { (...args: any[]): any }
+	interface Class<T> {
+		new (...args: any[]): T;
+	}
+	interface Function {
+		(...args: any[]): any;
+	}
 
 	interface nodeBounds {
 		minX: number;

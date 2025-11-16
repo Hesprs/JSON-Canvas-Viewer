@@ -1,5 +1,6 @@
-import { getColor, drawRoundRect, getAnchorCoord, destroyError, resizeCanvasForDPR } from '../../utilities';
-import style from './styles.scss?inline'
+import { destroyError } from '../../shared';
+import { api } from 'omnikernel';
+import style from './styles.scss?inline';
 
 export default class minimap {
 	private minimapCtx: CanvasRenderingContext2D;
@@ -9,7 +10,7 @@ export default class minimap {
 	private _toggleMinimapBtn: HTMLButtonElement | null;
 	private minimapCollapsed: boolean;
 	private minimapCache: { scale: number; centerX: number; centerY: number };
-	private data: runtimeData;
+	private Kernel: Amoeba;
 
 	private get minimap() {
 		if (this._minimap === null) throw destroyError;
@@ -28,29 +29,26 @@ export default class minimap {
 		return this._toggleMinimapBtn;
 	}
 
-	constructor(data: runtimeData, registry: registry) {
-		registry.register({
-			hooks: {
-				onLoad: [this.drawMinimap],
-				onRender: [this.updateViewportRectangle],
-				onDispose: [this.dispose],
-			},
-			options: {
-				minimap: {
-					collapsed: false,
+	constructor(Kernel: Amoeba) {
+		Kernel._register({
+			main: {
+				hooks: {
+					onLoaded: this.drawMinimap,
+					onRefresh: this.updateViewportRectangle,
+					onDispose: this.dispose,
 				},
 			},
-			api: {
-				minimap: {
-					toggleCollapse: this.toggleCollapse,
-				},
+			minimap: {
+				collapsed: false,
+				toggleCollapse: api(this.toggleCollapse),
 			},
+			dispose: this.dispose,
 		});
 
 		this._minimapContainer = document.createElement('div');
 		this._minimapContainer.className = 'minimap-container';
 
-		registry.api.dataManager.applyStyles(this._minimapContainer, style);
+		Kernel.utilities.applyStyles(this._minimapContainer, style);
 
 		this._toggleMinimapBtn = document.createElement('button');
 		this._toggleMinimapBtn.className = 'toggle-minimap collapse-button';
@@ -71,10 +69,10 @@ export default class minimap {
 		this._minimap.appendChild(this._viewportRectangle);
 		this._minimapContainer.appendChild(this._minimap);
 
-		data.container.appendChild(this._minimapContainer);
-		this.data = data;
+		Kernel.data.container().appendChild(this._minimapContainer);
+		this.Kernel = Kernel;
 
-		this.minimapCollapsed = registry.options.minimap.collapsed;
+		this.minimapCollapsed = Kernel.minimap.collapsed();
 		this._minimapContainer.classList.toggle('collapsed', this.minimapCollapsed);
 		this.minimapCache = {
 			scale: 1,
@@ -82,7 +80,7 @@ export default class minimap {
 			centerY: 0,
 		};
 		this._toggleMinimapBtn.addEventListener('click', this.toggleCollapse);
-		resizeCanvasForDPR(minimapCanvas, minimapCanvas.width, minimapCanvas.height);
+		Kernel.utilities.resizeCanvasForDPR(minimapCanvas, minimapCanvas.width, minimapCanvas.height);
 	}
 
 	private toggleCollapse = () => {
@@ -92,7 +90,7 @@ export default class minimap {
 	};
 
 	private drawMinimap = () => {
-		const bounds = this.data.nodeBounds;
+		const bounds = this.Kernel.data.nodeBounds();
 		if (!bounds) return;
 		const displayWidth = this.minimap.clientWidth;
 		const displayHeight = this.minimap.clientHeight;
@@ -106,27 +104,29 @@ export default class minimap {
 		this.minimapCtx.translate(this.minimapCache.centerX, this.minimapCache.centerY);
 		this.minimapCtx.scale(this.minimapCache.scale, this.minimapCache.scale);
 		this.minimapCtx.translate(-bounds.centerX, -bounds.centerY);
-		for (const edge of this.data.canvasData.edges) this.drawMinimapEdge(edge);
-		for (const node of this.data.canvasData.nodes) this.drawMinimapNode(node);
+		const canvasData = this.Kernel.data.canvasData();
+		for (const edge of canvasData.edges) this.drawMinimapEdge(edge);
+		for (const node of canvasData.nodes) this.drawMinimapNode(node);
 		this.minimapCtx.restore();
 	};
 
 	private drawMinimapNode = (node: JSONCanvasNode) => {
-		const colors = getColor(node.color);
+		const colors = this.Kernel.utilities.getColor(node.color);
 		const radius = 25;
 		this.minimapCtx.fillStyle = colors.border;
 		this.minimapCtx.globalAlpha = 0.3;
-		drawRoundRect(this.minimapCtx, node.x, node.y, node.width, node.height, radius);
+		this.Kernel.utilities.drawRoundRect(this.minimapCtx, node.x, node.y, node.width, node.height, radius);
 		this.minimapCtx.fill();
 		this.minimapCtx.globalAlpha = 1.0;
 	};
 
 	private drawMinimapEdge = (edge: JSONCanvasEdge) => {
-		const fromNode = this.data.nodeMap[edge.fromNode];
-		const toNode = this.data.nodeMap[edge.toNode];
+		const nodeMap = this.Kernel.data.nodeMap();
+		const fromNode = nodeMap[edge.fromNode];
+		const toNode = nodeMap[edge.toNode];
 		if (!fromNode || !toNode) return;
-		const [startX, startY] = getAnchorCoord(fromNode, edge.fromSide);
-		const [endX, endY] = getAnchorCoord(toNode, edge.toSide);
+		const [startX, startY] = this.Kernel.utilities.getAnchorCoord(fromNode, edge.fromSide);
+		const [endX, endY] = this.Kernel.utilities.getAnchorCoord(toNode, edge.toSide);
 		this.minimapCtx.beginPath();
 		this.minimapCtx.moveTo(startX, startY);
 		this.minimapCtx.lineTo(endX, endY);
@@ -137,12 +137,14 @@ export default class minimap {
 
 	private updateViewportRectangle = () => {
 		if (this.minimapCollapsed) return;
-		const bounds = this.data.nodeBounds;
+		const bounds = this.Kernel.data.nodeBounds();
+		const container	= this.Kernel.data.container();
+		const scale	= this.Kernel.data.scale();
 		if (!bounds) return;
-		const viewWidth = this.data.container.clientWidth / this.data.scale;
-		const viewHeight = this.data.container.clientHeight / this.data.scale;
-		const viewportCenterX = -this.data.offsetX / this.data.scale + this.data.container.clientWidth / (2 * this.data.scale);
-		const viewportCenterY = -this.data.offsetY / this.data.scale + this.data.container.clientHeight / (2 * this.data.scale);
+		const viewWidth = container.clientWidth / scale;
+		const viewHeight = container.clientHeight / scale;
+		const viewportCenterX = -this.Kernel.data.offsetX() / scale + container.clientWidth / (2 * scale);
+		const viewportCenterY = -this.Kernel.data.offsetY() / scale + container.clientHeight / (2 * scale);
 		const viewRectX = this.minimapCache.centerX + (viewportCenterX - viewWidth / 2 - bounds.centerX) * this.minimapCache.scale;
 		const viewRectY = this.minimapCache.centerY + (viewportCenterY - viewHeight / 2 - bounds.centerY) * this.minimapCache.scale;
 		const viewRectWidth = viewWidth * this.minimapCache.scale;

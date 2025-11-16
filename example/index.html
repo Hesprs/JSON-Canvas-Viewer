@@ -24,28 +24,19 @@
 	<!-- <canvas-viewer src="Example Canvas/introduction.canvas" extensions="minimap mistouchPrevention" options="noPreventionAtStart"></canvas-viewer> -->
 </body>
 <script type="module">
-	//import canvasViewer from '$';
-	//import minimap from '$/minimap';
-	//import controls from '$/controls';
-	import canvasViewer from '@/canvasViewer';
+	import canvasViewer from '@/main';
 	import minimap from '@/extensions/minimap';
 	import controls from '@/extensions/controls';
 	import debugPanel from '@/extensions/debugPanel';
+	import mistouchPreventer from '@/extensions/mistouchPreventer';
+
 	import katex from 'marked-katex-extension';
 	import { marked } from 'marked';
 	marked.use(katex());
-	const viewer = new canvasViewer(document.body, {
-		extensions: [minimap, controls, debugPanel],
-		options: {
-			minimap: {
-				collapsed: true,
-			},
-			controls: {
-				collapsed: true,
-			},
-		},
-	});
-	console.log(viewer.registry.api.dataManager.middleViewer());
-	viewer.loadCanvas('Example Canvas/introduction.canvas');
+
+	const viewer = new canvasViewer({
+		container: document.body,
+		canvasPath: 'Example Canvas/introduction.canvas',
+	}, [debugPanel, controls, minimap, mistouchPreventer]);
 </script>
 </html>

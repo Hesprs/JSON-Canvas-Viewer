@@ -1,66 +1,70 @@
-import { unexpectedError } from './utilities';
+import { unexpectedError } from './shared';
+import { hook, api } from 'omnikernel';
 
 const GRID_CELL_SIZE = 800;
 const INITIAL_VIEWPORT_PADDING = 100;
 
-export default class dataManager {
-	data: runtimeData;
-	registry: registry;
-	spatialGrid: Record<string, Array<JSONCanvasNode>> | null = null;
-	acceleration: {
-		pan: {
-			x: number;
-			y: number;
-		};
-		zoom: number;
-	} = {
-		pan: { x: 0, y: 0 },
-		zoom: 0,
-	};
-	animationId: number | null = null;
+export default class DataManager {
+	private Kernel;
+	private spatialGrid: Record<string, Array<JSONCanvasNode>> | null = null;
 
-	constructor(data: runtimeData, registry: registry) {
-		registry.register({
-			api: {
-				main: {
-					pan: this.pan,
-					zoom: this.zoom,
-					zoomToScale: this.zoomToScale,
-					panToCoords: this.panToCoords,
-					shiftFullscreen: this.shiftFullscreen,
-					resetView: this.resetView,
+	constructor(Kernel: Amoeba) {
+		Kernel._register({
+			main: {
+				api: {
+					pan: api(this.pan),
+					zoom: api(this.zoom),
+					zoomToScale: api(this.zoomToScale),
+					panToCoords: api(this.panToCoords),
+					shiftFullscreen: api(this.shiftFullscreen),
+					resetView: api(this.resetView),
+					loadCanvas: api(this.loadCanvas),
 				},
-				dataManager: {
-					middleViewer: this.middleViewer,
-					findNodeAt: this.findNodeAt,
-					applyStyles: this.applyStyles,
-				},
+				hooks: {
+					onToggleFullscreen: hook(),
+					onLoaded: hook(),
+				}
 			},
-			hooks: {
-				onLoad: [async (path: string) => await this.loadCanvas(path)],
-				onDispose: [this.dispose],
+			utilities: {
+				middleViewer: api(this.middleViewer),
+				findNodeAt: api(this.findNodeAt),
 			},
+			data: {
+				canvasData: null,
+				nodeMap: null,
+				canvasBaseDir: null,
+				nodeBounds: null,
+				offsetX: 0,
+				offsetY: 0,
+				scale: 1,
+			},
+			dispose: hook(),
+			allModuleLoadedAsync: this.loadCanvas
 		});
-		this.data = data;
-		this.registry = registry;
+		this.Kernel = Kernel;
 	}
-	loadCanvas = async (path: string) => {
+
+	private loadCanvas = async () => {
+		if (!this.Kernel.canvasPath) throw new Error('Canvas viewer failed: canvas path not provided.')
+		const path = this.Kernel.canvasPath();
 		try {
-			if (/^https?:\/\//.test(path)) this.data.canvasBaseDir = path.substring(0, path.lastIndexOf('/') + 1);
+			if (/^https?:\/\//.test(path)) this.Kernel.data.canvasBaseDir(path.substring(0, path.lastIndexOf('/') + 1));
 			else {
 				const lastSlash = path.lastIndexOf('/');
-				this.data.canvasBaseDir = lastSlash !== -1 ? path.substring(0, lastSlash + 1) : './';
+				this.Kernel.data.canvasBaseDir(lastSlash !== -1 ? path.substring(0, lastSlash + 1) : './');
 			}
-			this.data.canvasData = await fetch(path).then(res => res.json());
-			this.data.canvasData.nodes.forEach((node: JSONCanvasNode) => {
+			this.Kernel.data.canvasData(await fetch(path).then(res => res.json()));
+			this.Kernel.data.nodeMap({});
+			this.Kernel.data.canvasData().nodes.forEach((node: JSONCanvasNode) => {
 				if (node.type === 'file' && node.file && !node.file.includes('http')) {
 					const file = node.file.split('/');
 					node.file = file[file.length - 1];
 				}
-				this.data.nodeMap[node.id] = node;
+				this.Kernel.data.nodeMap()[node.id] = node;
 			});
-			this.data.nodeBounds = this.calculateNodeBounds();
+			this.Kernel.data.nodeBounds(this.calculateNodeBounds());
 			this.buildSpatialGrid();
+			this.Kernel.main.hooks.onLoaded();
 		} catch (err) {
 			console.error('Failed to load canvas data:', err);
 		}
@@ -69,7 +73,7 @@ export default class dataManager {
 	private findNodeAt = ({ x: mouseX, y: mouseY }: Coordinates) => {
 		const { x, y } = this.C2W(this.C2C({ x: mouseX, y: mouseY }));
 		let candidates: Array<JSONCanvasNode> = [];
-		if (!this.spatialGrid) candidates = this.data.canvasData.nodes;
+		if (!this.spatialGrid) candidates = this.Kernel.data.canvasData().nodes;
 		else {
 			const col = Math.floor(x / GRID_CELL_SIZE);
 			const row = Math.floor(y / GRID_CELL_SIZE);
@@ -106,7 +110,7 @@ export default class dataManager {
 			minY = Infinity,
 			maxX = -Infinity,
 			maxY = -Infinity;
-		this.data.canvasData.nodes.forEach(node => {
+		(this.Kernel.data.canvasData().nodes as Array<JSONCanvasNode>).forEach(node => {
 			minX = Math.min(minX, node.x);
 			minY = Math.min(minY, node.y);
 			maxX = Math.max(maxX, node.x + node.width);
@@ -120,9 +124,10 @@ export default class dataManager {
 	}
 
 	private buildSpatialGrid() {
-		if (this.data.canvasData.nodes.length < 50) return;
+		const canvasData = this.Kernel.data.canvasData();
+		if (canvasData.nodes.length < 50) return;
 		this.spatialGrid = {};
-		for (const node of this.data.canvasData.nodes) {
+		for (const node of canvasData.nodes) {
 			const minCol = Math.floor(node.x / GRID_CELL_SIZE);
 			const maxCol = Math.floor((node.x + node.width) / GRID_CELL_SIZE);
 			const minRow = Math.floor(node.y / GRID_CELL_SIZE);
@@ -138,38 +143,41 @@ export default class dataManager {
 	}
 
 	private zoom = (factor: number, origin: Coordinates) => {
-		const newScale = this.data.scale * factor;
+		const newScale = this.Kernel.data.scale() * factor;
 		this.zoomToScale(newScale, origin);
 	};
 	private zoomToScale = (newScale: number, origin: Coordinates) => {
 		const validNewScale = Math.max(Math.min(newScale, 20), 0.05);
-		if (validNewScale === this.data.scale) return;
+		const scaleRunner = this.Kernel.data.scale;
+		const scale = scaleRunner();
+		if (validNewScale === scale) return;
 		const canvasCoords = this.C2C(origin);
-		this.data.offsetX = origin.x - (canvasCoords.x * validNewScale) / this.data.scale;
-		this.data.offsetY = origin.y - (canvasCoords.y * validNewScale) / this.data.scale;
-		this.data.scale = validNewScale;
+		this.Kernel.data.offsetX(origin.x - (canvasCoords.x * validNewScale) / scale);
+		this.Kernel.data.offsetY(origin.y - (canvasCoords.y * validNewScale) / scale);
+		scaleRunner(validNewScale);
 	};
 	private pan = ({ x, y }: Coordinates) => {
-		this.data.offsetX += x;
-		this.data.offsetY += y;
+		this.Kernel.data.offsetX(this.Kernel.data.offsetX() + x);
+		this.Kernel.data.offsetY(this.Kernel.data.offsetY() + y);
 	};
 	private panToCoords = ({ x, y }: Coordinates) => {
-		this.data.offsetX = x;
-		this.data.offsetY = y;
+		this.Kernel.data.offsetX(x);
+		this.Kernel.data.offsetY(y);
 	};
 	private shiftFullscreen = (option: string = 'toggle') => {
-		if (!document.fullscreenElement && (option === 'toggle' || option === 'enter')) this.data.container.requestFullscreen();
+		if (!document.fullscreenElement && (option === 'toggle' || option === 'enter')) this.Kernel.data.container().requestFullscreen();
 		else if (document.fullscreenElement && (option === 'toggle' || option === 'exit')) document.exitFullscreen();
-		for (const hook of this.registry.hooks.onToggleFullscreen) hook();
+		this.Kernel.main.hooks.onToggleFullscreen();
 	};
 	private resetView = () => {
-		const bounds = this.data.nodeBounds;
-		if (!bounds || !this.data.container) return;
+		const bounds = this.Kernel.data.nodeBounds();
+		const container = this.Kernel.data.container();
+		if (!bounds || !container) return;
 		const contentWidth = bounds.width + INITIAL_VIEWPORT_PADDING * 2;
 		const contentHeight = bounds.height + INITIAL_VIEWPORT_PADDING * 2;
 		// Use logical dimensions for scaling calculations
-		const viewWidth = this.data.container.clientWidth;
-		const viewHeight = this.data.container.clientHeight;
+		const viewWidth = container.clientWidth;
+		const viewHeight = container.clientHeight;
 		const scaleX = viewWidth / contentWidth;
 		const scaleY = viewHeight / contentHeight;
 		const newScale = Math.round(Math.min(scaleX, scaleY) * 1000) / 1000;
@@ -180,39 +188,29 @@ export default class dataManager {
 			offsetX: viewWidth / 2 - contentCenterX * newScale,
 			offsetY: viewHeight / 2 - contentCenterY * newScale,
 		};
-		this.data.offsetX = initialView.offsetX;
-		this.data.offsetY = initialView.offsetY;
-		this.data.scale = initialView.scale;
+		this.Kernel.data.offsetX(initialView.offsetX);
+		this.Kernel.data.offsetY(initialView.offsetY);
+		this.Kernel.data.scale(initialView.scale);
 	};
 
 	// Container to Canvas
 	private C2C = ({ x: containerX, y: containerY }: Coordinates) => ({
-		x: containerX - this.data.offsetX,
-		y: containerY - this.data.offsetY,
+		x: containerX - this.Kernel.data.offsetX(),
+		y: containerY - this.Kernel.data.offsetY(),
 	});
 	// Canvas to World
 	private C2W = ({ x: canvasX, y: canvasY }: Coordinates) => ({
-		x: canvasX / this.data.scale,
-		y: canvasY / this.data.scale,
+		x: canvasX / this.Kernel.data.scale(),
+		y: canvasY / this.Kernel.data.scale(),
 	});
 
 	private middleViewer = () => {
+		const container = this.Kernel.data.container();
 		return {
-			x: this.data.container.clientWidth / 2,
-			y: this.data.container.clientHeight / 2,
-			width: this.data.container.clientWidth,
-			height: this.data.container.clientHeight,
+			x: container.clientWidth / 2,
+			y: container.clientHeight / 2,
+			width: container.clientWidth,
+			height: container.clientHeight,
 		};
-	};
-
-	private applyStyles = (container: HTMLElement, styleString: string) => {
-		const style = document.createElement('style');
-		style.innerHTML = styleString;
-		container.appendChild(style);
-	}
-
-	private dispose = () => {
-		if (this.animationId) cancelAnimationFrame(this.animationId);
-		this.animationId = null;
 	};
 }

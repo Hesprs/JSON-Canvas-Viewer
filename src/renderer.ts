@@ -1,4 +1,4 @@
-import { destroyError, unexpectedError, resizeCanvasForDPR, getColor, drawRoundRect, getAnchorCoord } from './utilities';
+import { destroyError, unexpectedError } from './shared';
 
 interface viewport {
 	left: number;
@@ -17,15 +17,25 @@ const NODE_RADIUS = 12;
 const FONT_COLOR = '#fff';
 const CSS_ZOOM_REDRAW_INTERVAL = 500;
 
-export default class renderer {
+export default class Renderer {
 	private _canvas: HTMLCanvasElement | null;
 	private ctx: CanvasRenderingContext2D;
-	private data: runtimeData;
+	private Kernel;
 	private zoomInOptimize: {
 		lastDrawnScale: number;
 		lastDrawnViewport: viewport;
 		timeout: NodeJS.Timeout | null;
 		lastCallTime: number;
+	} = {
+		lastDrawnScale: 0,
+		lastDrawnViewport: {
+			left: 0,
+			right: 0,
+			top: 0,
+			bottom: 0,
+		},
+		timeout: null,
+		lastCallTime: 0,
 	};
 
 	private get canvas() {
@@ -33,33 +43,27 @@ export default class renderer {
 		return this._canvas;
 	}
 
-	constructor(data: runtimeData, registry: registry) {
-		registry.register({
-			hooks: {
-				onDispose: [this.dispose],
-				onRender: [this.redraw],
-				onResize: [this.optimizeDPR],
+	constructor(Kernel: Amoeba) {
+		Kernel._register({
+			main: {
+				hooks: {
+					onRefresh: this.redraw,
+					onResize: this.optimizeDPR,
+				},
 			},
+			dispose: this.dispose,
 		});
 		this._canvas = document.createElement('canvas');
 		this._canvas.className = 'main-canvas';
-		data.container.appendChild(this._canvas);
 		this.ctx = this._canvas.getContext('2d') as CanvasRenderingContext2D;
-		this.zoomInOptimize = {
-			lastDrawnScale: 0,
-			lastDrawnViewport: {
-				left: 0,
-				right: 0,
-				top: 0,
-				bottom: 0,
-			},
-			timeout: null,
-			lastCallTime: 0,
-		};
-		this.data = data;
+		this.Kernel = Kernel;
+		this.Kernel.data.container().appendChild(this._canvas)
 	}
 
-	private optimizeDPR = () => resizeCanvasForDPR(this.canvas, this.data.container.offsetWidth, this.data.container.offsetHeight);
+	private optimizeDPR = () => {
+		const container = this.Kernel.data.container();
+		this.Kernel.utilities.resizeCanvasForDPR(this.canvas, container.offsetWidth, container.offsetHeight);
+	}
 
 	private redraw = () => {
 		if (this.zoomInOptimize.timeout) {
@@ -67,21 +71,24 @@ export default class renderer {
 			this.zoomInOptimize.timeout = null;
 		}
 		const now = Date.now();
-		const currentViewport = this.getCurrentViewport(this.data.offsetX, this.data.offsetY, this.data.scale);
-		if (this.isViewportInside(currentViewport, this.zoomInOptimize.lastDrawnViewport) && this.data.scale !== this.zoomInOptimize.lastDrawnScale) {
+		const offsetX = this.Kernel.data.offsetX();
+		const offsetY = this.Kernel.data.offsetY();
+		const scale = this.Kernel.data.scale();
+		const currentViewport = this.getCurrentViewport(offsetX, offsetY, scale);
+		if (this.isViewportInside(currentViewport, this.zoomInOptimize.lastDrawnViewport) && scale !== this.zoomInOptimize.lastDrawnScale) {
 			const timeSinceLast = now - this.zoomInOptimize.lastCallTime;
 			if (timeSinceLast < CSS_ZOOM_REDRAW_INTERVAL) {
 				this.zoomInOptimize.timeout = setTimeout(() => {
-					this.trueRedraw(this.data.offsetX, this.data.offsetY, this.data.scale, currentViewport);
+					this.trueRedraw(offsetX, offsetY, scale, currentViewport);
 					this.zoomInOptimize.lastCallTime = now;
 					this.zoomInOptimize.timeout = null;
 				}, 60);
-				this.fakeRedraw(currentViewport, this.data.scale);
+				this.fakeRedraw(currentViewport, scale);
 				return;
 			}
 		}
 		this.zoomInOptimize.lastCallTime = now;
-		this.trueRedraw(this.data.offsetX, this.data.offsetY, this.data.scale, currentViewport);
+		this.trueRedraw(offsetX, offsetY, scale, currentViewport);
 	};
 
 	private trueRedraw(offsetX: number, offsetY: number, scale: number, currentViewport: viewport) {
@@ -92,7 +99,8 @@ export default class renderer {
 		this.ctx.save();
 		this.ctx.translate(offsetX, offsetY);
 		this.ctx.scale(scale, scale);
-		this.data.canvasData.nodes.forEach(node => {
+		const canvasData = this.Kernel.data.canvasData();
+		(canvasData.nodes as Array<JSONCanvasNode>).forEach(node => {
 			switch (node.type) {
 				case 'group':
 					this.drawGroup(node, scale);
@@ -102,7 +110,7 @@ export default class renderer {
 					break;
 			}
 		});
-		this.data.canvasData.edges.forEach(edge => this.drawEdge(edge));
+		(canvasData.edges as Array<JSONCanvasEdge>).forEach(edge => this.drawEdge(edge));
 		this.ctx.restore();
 	}
 
@@ -118,10 +126,11 @@ export default class renderer {
 	private getCurrentViewport = (offsetX: number, offsetY: number, scale: number) => {
 		const left = -offsetX / scale;
 		const top = -offsetY / scale;
-		const right = left + this.data.container.clientWidth / scale;
-		const bottom = top + this.data.container.clientHeight / scale;
+		const container = this.Kernel.data.container();
+		const right = left + container.clientWidth / scale;
+		const bottom = top + container.clientHeight / scale;
 		return { left, top, right, bottom };
-	}
+	};
 
 	private drawLabelBar = (x: number, y: number, label: string, color: string, scale: number) => {
 		const barHeight = 30 * scale;
@@ -151,38 +160,39 @@ export default class renderer {
 		this.ctx.fillStyle = FONT_COLOR;
 		this.ctx.fillText(label, xPadding, barHeight * 0.65);
 		this.ctx.restore();
-	}
+	};
 
 	private drawNodeBackground = (node: JSONCanvasNode) => {
-		const colors = getColor(node.color);
+		const colors = this.Kernel.utilities.getColor(node.color);
 		const radius = NODE_RADIUS;
 		this.ctx.globalAlpha = 1.0;
 		this.ctx.fillStyle = colors.background;
-		drawRoundRect(this.ctx, node.x + 1, node.y + 1, node.width - 2, node.height - 2, radius);
+		this.Kernel.utilities.drawRoundRect(this.ctx, node.x + 1, node.y + 1, node.width - 2, node.height - 2, radius);
 		this.ctx.fill();
 		this.ctx.strokeStyle = colors.border;
 		this.ctx.lineWidth = 2;
-		drawRoundRect(this.ctx, node.x, node.y, node.width, node.height, radius);
+		this.Kernel.utilities.drawRoundRect(this.ctx, node.x, node.y, node.width, node.height, radius);
 		this.ctx.stroke();
-	}
+	};
 
 	private drawGroup = (node: JSONCanvasNode, scale: number) => {
 		this.drawNodeBackground(node);
-		if (node.label) this.drawLabelBar(node.x, node.y, node.label, getColor(node.color).border, scale);
-	}
+		if (node.label) this.drawLabelBar(node.x, node.y, node.label, this.Kernel.utilities.getColor(node.color).border, scale);
+	};
 
 	private drawFileNode = (node: JSONCanvasNode) => {
 		if (!node.file) throw unexpectedError;
 		this.ctx.fillStyle = FONT_COLOR;
 		this.ctx.font = '16px sans-serif';
 		this.ctx.fillText(node.file, node.x + 5, node.y - 10);
-	}
+	};
 
 	private drawEdge = (edge: RuntimeJSONCanvasEdge) => {
 		const { fromNode, toNode } = this.getEdgeNodes(edge);
 		if (!fromNode || !toNode) throw unexpectedError;
-		const [startX, startY] = getAnchorCoord(fromNode, edge.fromSide);
-		const [endX, endY] = getAnchorCoord(toNode, edge.toSide);
+		const gac = this.Kernel.utilities.getAnchorCoord;
+		const [startX, startY] = gac(fromNode, edge.fromSide);
+		const [endX, endY] = gac(toNode, edge.toSide);
 		let [startControlX, startControlY, endControlX, endControlY] = [0, 0, 0, 0];
 		if (!edge.controlPoints) {
 			[startControlX, startControlY, endControlX, endControlY] = this.getControlPoints(startX, startY, endX, endY, edge.fromSide, edge.toSide);
@@ -201,7 +211,7 @@ export default class renderer {
 			const labelHeight = 20;
 			this.ctx.fillStyle = '#222';
 			this.ctx.beginPath();
-			drawRoundRect(this.ctx, x - labelWidth / 2, y - labelHeight / 2 - 2, labelWidth, labelHeight, 4);
+			this.Kernel.utilities.drawRoundRect(this.ctx, x - labelWidth / 2, y - labelHeight / 2 - 2, labelWidth, labelHeight, 4);
 			this.ctx.fill();
 			this.ctx.fillStyle = '#ccc';
 			this.ctx.textAlign = 'center';
@@ -210,11 +220,11 @@ export default class renderer {
 			this.ctx.textAlign = 'left';
 			this.ctx.textBaseline = 'alphabetic';
 		}
-	}
+	};
 
 	private getEdgeNodes = (edge: JSONCanvasEdge) => ({
-		fromNode: this.data.nodeMap[edge.fromNode],
-		toNode: this.data.nodeMap[edge.toNode],
+		fromNode: this.Kernel.data.nodeMap()[edge.fromNode],
+		toNode: this.Kernel.data.nodeMap()[edge.toNode],
 	});
 
 	private getControlPoints = (startX: number, startY: number, endX: number, endY: number, fromSide: string, toSide: string) => {
@@ -256,7 +266,7 @@ export default class renderer {
 				break;
 		}
 		return [startControlX, startControlY, endControlX, endControlY];
-	}
+	};
 
 	private drawCurvedPath = (startX: number, startY: number, endX: number, endY: number, c1x: number, c1y: number, c2x: number, c2y: number) => {
 		this.ctx.beginPath();
@@ -265,7 +275,7 @@ export default class renderer {
 		this.ctx.strokeStyle = '#ccc';
 		this.ctx.lineWidth = 2;
 		this.ctx.stroke();
-	}
+	};
 
 	private drawArrowhead = (tipX: number, tipY: number, fromX: number, fromY: number) => {
 		const dx = tipX - fromX;
@@ -285,7 +295,7 @@ export default class renderer {
 		this.ctx.lineTo(rightX, rightY);
 		this.ctx.closePath();
 		this.ctx.fill();
-	}
+	};
 
 	private dispose = () => {
 		if (this.zoomInOptimize.timeout) {

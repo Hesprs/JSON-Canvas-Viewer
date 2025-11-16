@@ -1,4 +1,4 @@
-import { unexpectedError, round } from './utilities';
+import { unexpectedError } from './shared';
 
 export default class interactor extends EventTarget {
 	private monitoringElement: HTMLElement;
@@ -158,17 +158,12 @@ export default class interactor extends EventTarget {
 	};
 
 	private dispatchPanEvent(diff: Coordinates) {
-		const roundedDiff = {
-			x: round(diff.x, 1),
-			y: round(diff.y, 1),
-		};
-		const panEvent = new CustomEvent<Coordinates>('pan', { detail: roundedDiff });
+		const panEvent = new CustomEvent<Coordinates>('pan', { detail: diff });
 		this.dispatchEvent(panEvent);
 	}
 
 	private dispatchZoomEvent(factor: number, origin: Coordinates) {
-		const roundedFactor = round(factor, 4);
-		const zoomEvent = new CustomEvent<{ factor: number; origin: Coordinates }>('zoom', { detail: { factor: roundedFactor, origin: origin } });
+		const zoomEvent = new CustomEvent<{ factor: number; origin: Coordinates }>('zoom', { detail: { factor: factor, origin: origin } });
 		this.dispatchEvent(zoomEvent);
 	}
 
