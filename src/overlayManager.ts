@@ -1,40 +1,53 @@
-import { marked } from 'marked';
-import { RuntimeJSONCanvasNode, unexpectedError, destroyError } from './shared';
-import { hook } from 'omnikernel';
+import { FacadeUnit, Hook, manifest } from 'omnikernel';
+import type { ColorOutput } from '@/declarations';
+import { destroyError, type RuntimeJSONCanvasNode, unexpectedError } from '@/shared';
 
-export default class OverlayManager {
+@manifest({
+	name: 'overlayManager',
+	dependsOn: ['dataManager', 'canvasViewer', 'utilities', 'renderer', 'options'],
+	requires: ['interactionHandler'],
+})
+export default class OverlayManager extends FacadeUnit {
 	private _overlaysLayer: HTMLDivElement | null = document.createElement('div');
 	private overlays: Record<string, HTMLDivElement> = {}; // { id: node } the overlays in viewport
 	private selectedId: string | null = null;
 	private eventListeners: Record<string, Array<EventListener | null>> = {};
-	private Kernel;
+	private dataManager: Facade;
+	private utilities: Facade;
+	private parser: (content: string) => Promise<string>;
 
 	private get overlaysLayer() {
 		if (!this._overlaysLayer) throw destroyError;
 		return this._overlaysLayer;
 	}
 
-	constructor(Kernel: Amoeba) {
-		Kernel._register({
-			main: {
-				hooks: {
-					onRefresh: this.updateOverlays,
-					onClick: this.select,
-					onLoaded: this.onLoaded,
-					onInteractionStart: hook({ corporate: true }),
-					onInteractionEnd: hook({ corporate: true }),
-				},
+	constructor(...args: UnitArgs) {
+		super(...args);
+		this.Kernel.register(
+			{
+				onInteractionStart: new Hook(),
+				onInteractionEnd: new Hook(),
 			},
-			dispose: this.dispose,
-		});
-		this.Kernel = Kernel;
+			this.facade,
+		);
+		this.dataManager = this.deps.dataManager;
+		this.utilities = this.deps.utilities;
+		this.parser = this.deps.options.markdownParser() as typeof this.parser;
+		if (!this.parser) throw new Error('[JSONCanvasViewer] Markdown parser is not provided.');
+		this.Kernel.register(
+			{ hooks: { onCanvasFetched: { overlayManager: this.onFetched } } },
+			this.dataManager,
+		);
+		this.Kernel.register({ onRefresh: { overlayManager: this.updateOverlays } }, this.deps.canvasViewer);
+		this.Kernel.register({ onClick: { overlayManager: this.select } }, this.deps.interactionHandler);
+
 		this._overlaysLayer = document.createElement('div');
 		this._overlaysLayer.className = 'overlays';
-		Kernel.data.container().appendChild(this.overlaysLayer);
+		(this.dataManager.data.container() as HTMLElement).appendChild(this.overlaysLayer);
 	}
 
-	private onLoaded = () => {
-		const cbd = this.Kernel.data.canvasBaseDir();
+	private onFetched = () => {
+		const cbd = this.dataManager.data.canvasBaseDir();
 		const overlayCreators = {
 			text: (node: RuntimeJSONCanvasNode) => {
 				if (!node.text) throw unexpectedError;
@@ -43,8 +56,10 @@ export default class OverlayManager {
 			file: (node: RuntimeJSONCanvasNode) => {
 				if (!node.file) throw unexpectedError;
 				if (node.file.match(/\.md$/i)) this.loadMarkdownForNode(node);
-				else if (node.file.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i)) this.updateOrCreateOverlay(node, cbd + node.file, 'image');
-				else if (node.file.match(/\.(mp3|wav)$/i)) this.updateOrCreateOverlay(node, cbd + node.file, 'audio');
+				else if (node.file.match(/\.(png|jpg|jpeg|gif|svg|webp)$/i))
+					this.updateOrCreateOverlay(node, cbd + node.file, 'image');
+				else if (node.file.match(/\.(mp3|wav)$/i))
+					this.updateOrCreateOverlay(node, cbd + node.file, 'audio');
 			},
 			link: (node: RuntimeJSONCanvasNode) => {
 				if (!node.url) throw unexpectedError;
@@ -52,7 +67,11 @@ export default class OverlayManager {
 			},
 			group: () => {},
 		};
-		Object.values(this.Kernel.data.nodeMap() as Record<string, RuntimeJSONCanvasNode>).forEach(node => overlayCreators[node.type](node));
+		Object.values(this.dataManager.data.nodeMap() as Record<string, RuntimeJSONCanvasNode>).forEach(
+			node => {
+				overlayCreators[node.type](node);
+			},
+		);
 	};
 
 	private select = (id: string | null) => {
@@ -61,8 +80,8 @@ export default class OverlayManager {
 		if (previous) previous.classList.remove('active');
 		if (current) {
 			current.classList.add('active');
-			this.Kernel.main.hooks.onInteractionStart();
-		} else this.Kernel.main.hooks.onInteractionEnd();
+			this.facade.onInteractionStart();
+		} else this.facade.onInteractionEnd();
 		this.selectedId = id;
 	};
 
@@ -72,27 +91,31 @@ export default class OverlayManager {
 			this.updateOrCreateOverlay(node, node.mdContent, 'markdown');
 			try {
 				if (!node.file) throw unexpectedError;
-				const response = await fetch(this.Kernel.data.canvasBaseDir() + node.file);
+				const response = await fetch(this.dataManager.data.canvasBaseDir() + node.file);
 				const result = await response.text();
 				const frontmatterMatch = result.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
 				if (frontmatterMatch) {
-					const frontmatter = frontmatterMatch[1].split('\n').reduce((acc: Record<string, string>, line) => {
-						const [key, value] = line.split(':').map(s => s.trim());
-						acc[key] = value;
-						return acc;
-					}, {});
-					node.mdContent = await marked.parse(frontmatterMatch[2].trim());
+					const frontmatter = frontmatterMatch[1]
+						.split('\n')
+						.reduce((acc: Record<string, string>, line) => {
+							const [key, value] = line.split(':').map(s => s.trim());
+							acc[key] = value;
+							return acc;
+						}, {});
+					node.mdContent = await this.parser(frontmatterMatch[2].trim());
 					node.mdFrontmatter = frontmatter;
-				} else node.mdContent = await marked.parse(result);
+				} else node.mdContent = await this.parser(result);
 			} catch (err) {
-				console.error('Failed to load markdown:', err);
+				console.error('[JSONCanvasViewer] Failed to load markdown:', err);
 				node.mdContent = 'Failed to load content.';
 			}
 		}
 		this.updateOrCreateOverlay(node, node.mdContent, 'markdown');
 	};
 
-	private updateOverlays = () => (this.overlaysLayer.style.transform = `translate(${this.Kernel.data.offsetX()}px, ${this.Kernel.data.offsetY()}px) scale(${this.Kernel.data.scale()})`);
+	private updateOverlays = () => {
+		this.overlaysLayer.style.transform = `translate(${this.dataManager.data.offsetX()}px, ${this.dataManager.data.offsetY()}px) scale(${this.dataManager.data.scale()})`;
+	};
 
 	private async updateOrCreateOverlay(node: RuntimeJSONCanvasNode, content: string, type: string) {
 		let element = this.overlays[node.id];
@@ -100,22 +123,24 @@ export default class OverlayManager {
 			element = await this.constructOverlay(node, content, type);
 			this.overlaysLayer.appendChild(element);
 			this.overlays[node.id] = element;
-			element.style.left = node.x + 'px';
-			element.style.top = node.y + 'px';
-			element.style.width = node.width + 'px';
-			element.style.height = node.height + 'px';
+			element.style.left = `${node.x}px`;
+			element.style.top = `${node.y}px`;
+			element.style.width = `${node.width}px`;
+			element.style.height = `${node.height}px`;
 		}
 		if (element.style.display === 'none') element.style.display = 'flex';
 		if (type === 'markdown') {
 			const parsedContentContainer = element.getElementsByClassName('parsed-content-wrapper')[0];
 			if (!node.mdContent) throw unexpectedError;
-			if (parsedContentContainer.innerHTML !== node.mdContent) parsedContentContainer.innerHTML = node.mdContent;
-			if (!element.classList.contains('rtl') && node.mdFrontmatter?.direction === 'rtl') element.classList.add('rtl');
+			if (parsedContentContainer.innerHTML !== node.mdContent)
+				parsedContentContainer.innerHTML = node.mdContent;
+			if (!element.classList.contains('rtl') && node.mdFrontmatter?.direction === 'rtl')
+				element.classList.add('rtl');
 		}
 	}
 
 	private async constructOverlay(node: RuntimeJSONCanvasNode, content: string, type: string) {
-		const color = this.Kernel.utilities.getColor(node.color);
+		const color = this.utilities.getColor(node.color) as ColorOutput;
 		const overlay = document.createElement('div');
 		overlay.classList.add('overlay-container');
 		overlay.id = node.id;
@@ -126,7 +151,7 @@ export default class OverlayManager {
 			case 'markdown': {
 				overlay.classList.add('markdown-content');
 				const parsedContentWrapper = document.createElement('div');
-				parsedContentWrapper.innerHTML = await marked.parse(content || '');
+				parsedContentWrapper.innerHTML = await this.parser(content || '');
 				parsedContentWrapper.classList.add('parsed-content-wrapper');
 				overlay.appendChild(parsedContentWrapper);
 				break;
@@ -168,10 +193,10 @@ export default class OverlayManager {
 		overlayBorder.style.borderColor = color.border;
 		overlay.appendChild(overlayBorder);
 		const onStart = () => {
-			if (node.id === this.selectedId) this.Kernel.main.hooks.onInteractionStart();
+			if (node.id === this.selectedId) this.facade.onInteractionStart();
 		};
 		const onEnd = () => {
-			if (node.id === this.selectedId) this.Kernel.main.hooks.onInteractionEnd();
+			if (node.id === this.selectedId) this.facade.onInteractionEnd();
 		};
 		overlay.addEventListener('pointerenter', onStart);
 		overlay.addEventListener('pointerleave', onEnd);
@@ -181,7 +206,7 @@ export default class OverlayManager {
 		return overlay;
 	}
 
-	private dispose = () => {
+	dispose = () => {
 		while (this.overlaysLayer.firstElementChild) {
 			const child = this.overlaysLayer.firstElementChild;
 			if (this.eventListeners[child.id]) {

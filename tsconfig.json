@@ -1,20 +1,24 @@
 {
 	"compilerOptions": {
-		"target": "ES2022",
+		"target": "ESNext",
 		"module": "ESNext",
 		"moduleResolution": "bundler",
-		"outDir": "./dist",
-		"declarationDir": "./dist/types",
 		"strict": true,
 		"esModuleInterop": true,
-		"emitDeclarationOnly": true,
 		"skipLibCheck": true,
 		"forceConsistentCasingInFileNames": true,
 		"declaration": true,
-		"sourceMap": true,
-		"noEmit": false,
-		"lib": ["ES2022", "DOM"]
+		"emitDeclarationOnly": true,
+		"declarationDir": "./dist/types",
+		"outDir": "./dist/types",
+		"lib": ["ESNext", "DOM"],
+		"paths": {
+			"@/*": ["./src/*"],
+			"@": ["./src"],
+			"$/*": ["./src/*"],
+			"$": ["./src"]
+		}
 	},
-	"include": ["src"],
-	"exclude": ["node_modules", "vite.config.ts", "dist"]
+	"include": ["src/**/*", "test/**/*"],
+	"exclude": ["node_modules", "./dist"]
 }

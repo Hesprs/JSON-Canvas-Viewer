@@ -1,54 +1,11 @@
 {
 	"name": "json-canvas-viewer",
-	"version": "3.2.0",
-	"description": "A TypeScript-based viewer for JSON Canvas, easy to embed into websites.",
+	"version": "4.0.0",
+	"description": "An extensible TypeScript-based viewer for JSON Canvas, easy to embed into websites.",
 	"type": "module",
 	"types": "dist/types/canvasViewer.d.ts",
-	"main": "dist/cjs/index.js",
-	"module": "dist/es/index.js",
-	"exports": {
-		".": {
-			"types": "./dist/types/canvasViewer.d.ts",
-			"import": "./dist/es/index.js",
-			"require": "./dist/cjs/index.js"
-		},
-		"./minimap": {
-			"types": "./dist/types/extensions/minimap/index.d.ts",
-			"import": "./dist/es/minimap.js",
-			"require": "./dist/cjs/minimap.js"
-		},
-		"./controls": {
-			"types": "./dist/types/extensions/controls/index.d.ts",
-			"import": "./dist/es/controls.js",
-			"require": "./dist/cjs/controls.js"
-		},
-		"./mistouchPreventer": {
-			"types": "./dist/types/extensions/mistouchPreventer/index.d.ts",
-			"import": "./dist/es/mistouchPreventer.js",
-			"require": "./dist/cjs/mistouchPreventer.js"
-		},
-		"./debugPanel": {
-			"types": "./dist/types/extensions/debugPanel/index.d.ts",
-			"import": "./dist/es/debugPanel.js",
-			"require": "./dist/cjs/debugPanel.js"
-		}
-	},
-	"typesVersions": {
-		"*": {
-			"minimap": [
-				"dist/types/extensions/minimap/index.d.ts"
-			],
-			"controls": [
-				"dist/types/extensions/controls/index.d.ts"
-			],
-			"mistouchPreventer": [
-				"dist/types/extensions/mistouchPreventer/index.d.ts"
-			],
-			"debugPanel": [
-				"dist/types/extensions/debugPanel/index.d.ts"
-			]
-		}
-	},
+	"main": "dist/index.cjs",
+	"module": "dist/index.js",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/Hesprs/JSON-Canvas-Viewer.git"
@@ -57,45 +14,40 @@
 	"bugs": {
 		"url": "https://github.com/Hesprs/JSON-Canvas-Viewer/issues"
 	},
-	"keywords": [
-		"Obsidian",
-		"JSON Canvas",
-		"Viewer",
-		"Front-end",
-		"HTML Canvas",
-		"TypeScript"
-	],
+	"keywords": ["obsidian", "JSONCanvas", "front-end", "HTMLCanvas", "TypeScript"],
 	"author": {
 		"name": "Hēsperus",
 		"email": "hesprs@outlook.com"
 	},
 	"license": "MIT",
-	"packageManager": "pnpm@10.15.1",
+	"packageManager": "pnpm@10.24.0",
 	"devDependencies": {
-		"@eslint/js": "^9.39.1",
-		"@rollup/plugin-terser": "^0.4.4",
+		"@biomejs/biome": "^2.3.8",
+		"@open-xchange/vite-plugin-es-decorators": "^1.1.1",
 		"@types/node": "^24.10.1",
-		"eslint": "^9.39.1",
-		"eslint-config-prettier": "^10.1.8",
-		"sass": "^1.94.0",
+		"marked": "^17.0.1",
+		"marked-katex-extension": "^5.1.6",
+		"sass": "^1.94.2",
+		"tsc-alias": "^1.8.16",
 		"typescript": "^5.9.3",
-		"typescript-eslint": "^8.46.4",
-		"vite": "^7.2.2"
+		"vite": "^7.2.7"
 	},
-	"files": [
-		"dist"
-	],
+	"peerDependencies": {
+		"marked": "^17.0.1"
+	},
+	"peerDependenciesMeta": {
+		"marked": {
+			"optional": true
+		}
+	},
+	"files": ["dist"],
 	"scripts": {
-		"test": "vite --open",
-		"lint": "eslint .",
-		"build-types": "tsc --project tsconfig.json",
-		"build": "vite build && pnpm run build-types"
+		"dev": "vite",
+		"lint": "biome check --write",
+		"build": "vite build && tsc && tsc-alias",
+		"check": "tsc --noEmit && biome check"
 	},
 	"dependencies": {
-		"marked": "^16.4.2",
-		"omnikernel": "file:/home/hesprs/Documents/Code/JSON-Canvas-Viewer/src/omnikernel-0.0.1.tgz"
-	},
-	"optionalDependencies": {
-		"marked-katex-extension": "^5.1.6"
+		"omnikernel": "file:src/omnikernel-0.3.1.tgz"
 	}
 }

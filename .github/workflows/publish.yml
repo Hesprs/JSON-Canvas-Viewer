@@ -15,7 +15,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4.2.0
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -23,11 +26,6 @@ jobs:
           node-version: latest
           cache: 'pnpm'
           registry-url: 'https://registry.npmjs.org/'
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4.2.0
-        with:
-          version: latest
 
       - name: Install dependencies
         run: pnpm install

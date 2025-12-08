@@ -1,10 +1,13 @@
 # JSON Canvas Viewer
 
-![TypeScript](https://img.shields.io/badge/Types-Strict-333333?logo=typescript&labelColor=blue&logoColor=white)
 [![npm](https://img.shields.io/npm/v/json-canvas-viewer?logo=npm&labelColor=red&logoColor=white&color=333333)](https://www.npmjs.com/package/json-canvas-viewer)
-[![publish size](https://img.shields.io/bundlephobia/min/json-canvas-viewer?style=flat&logo=webpack&labelColor=00b554&logoColor=white&color=333333&label=Minified%20Size)](https://bundlephobia.com/package/json-canvas-viewer)
+[![publish size](https://img.shields.io/bundlephobia/min/json-canvas-viewer?style=flat&logo=webpack&labelColor=orange&logoColor=white&color=333333&label=Minified%20Size)](https://bundlephobia.com/package/json-canvas-viewer)
+[![ci](https://img.shields.io/github/actions/workflow/status/hesprs/json-canvas-viewer/ci.yml?style=flat&logo=github&logoColor=white&label=CI%20for%20Main&labelColor=d4ab00&color=333333)](https://github.com/hesprs/json-canvas-viewer/actions)
+[![CodeFactor](https://img.shields.io/codefactor/grade/github/hesprs/json-canvas-viewer?style=flat&logo=codefactor&logoColor=white&label=Code%20Quality&labelColor=17b37a&color=333333)](https://www.codefactor.io/repository/github/hesprs/json-canvas-viewer)
+![TypeScript](https://img.shields.io/badge/Types-Strict-333333?logo=typescript&labelColor=blue&logoColor=white)
+[![Snyk Security](https://img.shields.io/badge/Snyk%20Security-Monitored-333333?logo=snyk&style=flat&labelColor=8A2BE2&logoColor=white)](https://snyk.io/test/npm/json-canvas-viewer)
 
-![Canvas Viewer](example/preview.png)
+![Canvas Viewer](test/preview.png)
 
 A **TypeScript-based** viewer for **JSON Canvas** files. View and interact with your canvas files directly in the browser, or embed the viewer in front-end projects with ease. It is built without frameworks so it can be easily integrated into any framework.
 
