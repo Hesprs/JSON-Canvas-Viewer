@@ -1,3 +1,4 @@
+import Purify from 'dompurify';
 import { FacadeUnit, Hook, manifest } from 'omnikernel';
 import type { ColorOutput } from '@/declarations';
 import { destroyError, type RuntimeJSONCanvasNode, unexpectedError } from '@/shared';
@@ -102,9 +103,9 @@ export default class OverlayManager extends FacadeUnit {
 							acc[key] = value;
 							return acc;
 						}, {});
-					node.mdContent = await this.parser(frontmatterMatch[2].trim());
+					node.mdContent = Purify.sanitize(await this.parser(frontmatterMatch[2].trim()));
 					node.mdFrontmatter = frontmatter;
-				} else node.mdContent = await this.parser(result);
+				} else node.mdContent = Purify.sanitize(await this.parser(result));
 			} catch (err) {
 				console.error('[JSONCanvasViewer] Failed to load markdown:', err);
 				node.mdContent = 'Failed to load content.';
@@ -151,7 +152,7 @@ export default class OverlayManager extends FacadeUnit {
 			case 'markdown': {
 				overlay.classList.add('markdown-content');
 				const parsedContentWrapper = document.createElement('div');
-				parsedContentWrapper.innerHTML = await this.parser(content || '');
+				parsedContentWrapper.innerHTML = Purify.sanitize(await this.parser(content || ''));
 				parsedContentWrapper.classList.add('parsed-content-wrapper');
 				overlay.appendChild(parsedContentWrapper);
 				break;

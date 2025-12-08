@@ -16,6 +16,9 @@ export default defineConfig({
 		emptyOutDir: true,
 		minify: 'terser',
 		sourcemap: true,
+		rollupOptions: {
+			external: ['dompurify'],
+		},
 		lib: {
 			entry: {
 				index: resolve(__dirname, 'src'),
