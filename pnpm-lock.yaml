@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       omnikernel:
-        specifier: file:/home/hesprs/Documents/Code/JSON-Canvas-Viewer/src/omnikernel-0.3.1.tgz
+        specifier: file:src/omnikernel-0.3.1.tgz
         version: file:src/omnikernel-0.3.1.tgz
     devDependencies:
       '@biomejs/biome':
