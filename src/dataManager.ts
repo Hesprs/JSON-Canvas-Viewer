@@ -1,70 +1,80 @@
-import { unexpectedError } from './shared';
-import { hook, api } from 'omnikernel';
+import { FacadeUnit, Hook, manifest, Runner, Store } from 'omnikernel';
+import type { Coordinates, NodeBounds } from '@/declarations';
+import { unexpectedError } from '@/shared';
 
 const GRID_CELL_SIZE = 800;
 const INITIAL_VIEWPORT_PADDING = 100;
 
-export default class DataManager {
-	private Kernel;
+@manifest({
+	name: 'dataManager',
+	dependsOn: ['options'],
+})
+export default class DataManager extends FacadeUnit {
 	private spatialGrid: Record<string, Array<JSONCanvasNode>> | null = null;
 
-	constructor(Kernel: Amoeba) {
-		Kernel._register({
-			main: {
+	constructor(...args: UnitArgs) {
+		super(...args);
+		this.Kernel.register(
+			{
 				api: {
-					pan: api(this.pan),
-					zoom: api(this.zoom),
-					zoomToScale: api(this.zoomToScale),
-					panToCoords: api(this.panToCoords),
-					shiftFullscreen: api(this.shiftFullscreen),
-					resetView: api(this.resetView),
-					loadCanvas: api(this.loadCanvas),
+					pan: this.pan,
+					zoom: this.zoom,
+					zoomToScale: this.zoomToScale,
+					panToCoords: this.panToCoords,
+					shiftFullscreen: this.shiftFullscreen,
+					resetView: this.resetView,
+					loadCanvas: this.loadCanvas,
 				},
 				hooks: {
-					onToggleFullscreen: hook(),
-					onLoaded: hook(),
-				}
+					onToggleFullscreen: new Hook(),
+					onCanvasFetched: new Hook(),
+				},
+				utilities: {
+					middleViewer: this.middleViewer,
+					findNodeAt: this.findNodeAt,
+				},
+				data: {
+					canvasData: null,
+					nodeMap: new Store({}),
+					canvasBaseDir: null,
+					nodeBounds: null,
+					offsetX: 0,
+					offsetY: 0,
+					scale: 1,
+					container: document.createElement('div'),
+				},
 			},
-			utilities: {
-				middleViewer: api(this.middleViewer),
-				findNodeAt: api(this.findNodeAt),
+			this.facade,
+		);
+		this.Kernel.register(
+			{
+				canvasPath: { dataManager: new Runner(this.loadCanvas, { immediate: true, async: true }) },
 			},
-			data: {
-				canvasData: null,
-				nodeMap: null,
-				canvasBaseDir: null,
-				nodeBounds: null,
-				offsetX: 0,
-				offsetY: 0,
-				scale: 1,
-			},
-			dispose: hook(),
-			allModuleLoadedAsync: this.loadCanvas
-		});
-		this.Kernel = Kernel;
+			this.deps.options,
+		);
 	}
 
 	private loadCanvas = async () => {
-		if (!this.Kernel.canvasPath) throw new Error('Canvas viewer failed: canvas path not provided.')
-		const path = this.Kernel.canvasPath();
+		if (!this.deps.options.canvasPath) throw new Error('[JSONCanvasViewer] Canvas path not provided.');
+		const path = this.deps.options.canvasPath() as string;
 		try {
-			if (/^https?:\/\//.test(path)) this.Kernel.data.canvasBaseDir(path.substring(0, path.lastIndexOf('/') + 1));
+			if (/^https?:\/\//.test(path))
+				this.facade.data.canvasBaseDir(path.substring(0, path.lastIndexOf('/') + 1));
 			else {
 				const lastSlash = path.lastIndexOf('/');
-				this.Kernel.data.canvasBaseDir(lastSlash !== -1 ? path.substring(0, lastSlash + 1) : './');
+				this.facade.data.canvasBaseDir(lastSlash !== -1 ? path.substring(0, lastSlash + 1) : './');
 			}
-			this.Kernel.data.canvasData(await fetch(path).then(res => res.json()));
-			this.Kernel.data.nodeMap({});
-			this.Kernel.data.canvasData().nodes.forEach((node: JSONCanvasNode) => {
+			this.facade.data.canvasData(await fetch(path).then(res => res.json()));
+			(this.facade.data.canvasData() as JSONCanvas).nodes.forEach((node: JSONCanvasNode) => {
 				if (node.type === 'file' && node.file && !node.file.includes('http')) {
 					const file = node.file.split('/');
 					node.file = file[file.length - 1];
 				}
-				this.Kernel.data.nodeMap()[node.id] = node;
+				(this.facade.data.nodeMap() as Record<string, JSONCanvasNode>)[node.id] = node;
 			});
-			this.Kernel.data.nodeBounds(this.calculateNodeBounds());
+			this.facade.data.nodeBounds(this.calculateNodeBounds());
 			this.buildSpatialGrid();
-			this.Kernel.main.hooks.onLoaded();
+			this.facade.hooks.onCanvasFetched();
 		} catch (err) {
 			console.error('Failed to load canvas data:', err);
 		}
@@ -73,7 +83,7 @@ export default class DataManager {
 	private findNodeAt = ({ x: mouseX, y: mouseY }: Coordinates) => {
 		const { x, y } = this.C2W(this.C2C({ x: mouseX, y: mouseY }));
 		let candidates: Array<JSONCanvasNode> = [];
-		if (!this.spatialGrid) candidates = this.Kernel.data.canvasData().nodes;
+		if (!this.spatialGrid) candidates = (this.facade.data.canvasData() as JSONCanvas).nodes;
 		else {
 			const col = Math.floor(x / GRID_CELL_SIZE);
 			const row = Math.floor(y / GRID_CELL_SIZE);
@@ -81,7 +91,14 @@ export default class DataManager {
 			candidates = this.spatialGrid[key] || [];
 		}
 		for (const node of candidates) {
-			if (x < node.x || x > node.x + node.width || y < node.y || y > node.y + node.height || this.judgeInteract(node) === 'non-interactive') continue;
+			if (
+				x < node.x ||
+				x > node.x + node.width ||
+				y < node.y ||
+				y > node.y + node.height ||
+				this.judgeInteract(node) === 'non-interactive'
+			)
+				continue;
 			return node;
 		}
 		return null;
@@ -110,7 +127,7 @@ export default class DataManager {
 			minY = Infinity,
 			maxX = -Infinity,
 			maxY = -Infinity;
-		(this.Kernel.data.canvasData().nodes as Array<JSONCanvasNode>).forEach(node => {
+		(this.facade.data.canvasData() as JSONCanvas).nodes.forEach(node => {
 			minX = Math.min(minX, node.x);
 			minY = Math.min(minY, node.y);
 			maxX = Math.max(maxX, node.x + node.width);
@@ -124,7 +141,7 @@ export default class DataManager {
 	}
 
 	private buildSpatialGrid() {
-		const canvasData = this.Kernel.data.canvasData();
+		const canvasData = this.facade.data.canvasData() as JSONCanvas;
 		if (canvasData.nodes.length < 50) return;
 		this.spatialGrid = {};
 		for (const node of canvasData.nodes) {
@@ -143,35 +160,37 @@ export default class DataManager {
 	}
 
 	private zoom = (factor: number, origin: Coordinates) => {
-		const newScale = this.Kernel.data.scale() * factor;
+		const newScale = (this.facade.data.scale() as number) * factor;
 		this.zoomToScale(newScale, origin);
 	};
 	private zoomToScale = (newScale: number, origin: Coordinates) => {
 		const validNewScale = Math.max(Math.min(newScale, 20), 0.05);
-		const scaleRunner = this.Kernel.data.scale;
-		const scale = scaleRunner();
+		const scaleRunner = this.facade.data.scale;
+		const scale = scaleRunner() as number;
 		if (validNewScale === scale) return;
 		const canvasCoords = this.C2C(origin);
-		this.Kernel.data.offsetX(origin.x - (canvasCoords.x * validNewScale) / scale);
-		this.Kernel.data.offsetY(origin.y - (canvasCoords.y * validNewScale) / scale);
+		this.facade.data.offsetX(origin.x - (canvasCoords.x * validNewScale) / scale);
+		this.facade.data.offsetY(origin.y - (canvasCoords.y * validNewScale) / scale);
 		scaleRunner(validNewScale);
 	};
 	private pan = ({ x, y }: Coordinates) => {
-		this.Kernel.data.offsetX(this.Kernel.data.offsetX() + x);
-		this.Kernel.data.offsetY(this.Kernel.data.offsetY() + y);
+		this.facade.data.offsetX((this.facade.data.offsetX() as number) + x);
+		this.facade.data.offsetY((this.facade.data.offsetY() as number) + y);
 	};
 	private panToCoords = ({ x, y }: Coordinates) => {
-		this.Kernel.data.offsetX(x);
-		this.Kernel.data.offsetY(y);
+		this.facade.data.offsetX(x);
+		this.facade.data.offsetY(y);
 	};
 	private shiftFullscreen = (option: string = 'toggle') => {
-		if (!document.fullscreenElement && (option === 'toggle' || option === 'enter')) this.Kernel.data.container().requestFullscreen();
-		else if (document.fullscreenElement && (option === 'toggle' || option === 'exit')) document.exitFullscreen();
-		this.Kernel.main.hooks.onToggleFullscreen();
+		if (!document.fullscreenElement && (option === 'toggle' || option === 'enter'))
+			(this.facade.data.container() as HTMLElement).requestFullscreen();
+		else if (document.fullscreenElement && (option === 'toggle' || option === 'exit'))
+			document.exitFullscreen();
+		this.facade.hooks.onToggleFullscreen();
 	};
 	private resetView = () => {
-		const bounds = this.Kernel.data.nodeBounds();
-		const container = this.Kernel.data.container();
+		const bounds = this.facade.data.nodeBounds() as NodeBounds;
+		const container = this.facade.data.container() as HTMLDivElement;
 		if (!bounds || !container) return;
 		const contentWidth = bounds.width + INITIAL_VIEWPORT_PADDING * 2;
 		const contentHeight = bounds.height + INITIAL_VIEWPORT_PADDING * 2;
@@ -188,24 +207,24 @@ export default class DataManager {
 			offsetX: viewWidth / 2 - contentCenterX * newScale,
 			offsetY: viewHeight / 2 - contentCenterY * newScale,
 		};
-		this.Kernel.data.offsetX(initialView.offsetX);
-		this.Kernel.data.offsetY(initialView.offsetY);
-		this.Kernel.data.scale(initialView.scale);
+		this.facade.data.offsetX(initialView.offsetX);
+		this.facade.data.offsetY(initialView.offsetY);
+		this.facade.data.scale(initialView.scale);
 	};
 
 	// Container to Canvas
 	private C2C = ({ x: containerX, y: containerY }: Coordinates) => ({
-		x: containerX - this.Kernel.data.offsetX(),
-		y: containerY - this.Kernel.data.offsetY(),
+		x: containerX - (this.facade.data.offsetX() as number),
+		y: containerY - (this.facade.data.offsetY() as number),
 	});
 	// Canvas to World
 	private C2W = ({ x: canvasX, y: canvasY }: Coordinates) => ({
-		x: canvasX / this.Kernel.data.scale(),
-		y: canvasY / this.Kernel.data.scale(),
+		x: canvasX / (this.facade.data.scale() as number),
+		y: canvasY / (this.facade.data.scale() as number),
 	});
 
 	private middleViewer = () => {
-		const container = this.Kernel.data.container();
+		const container = this.facade.data.container() as HTMLDivElement;
 		return {
 			x: container.clientWidth / 2,
 			y: container.clientHeight / 2,

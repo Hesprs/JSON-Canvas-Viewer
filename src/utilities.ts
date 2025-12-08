@@ -1,17 +1,22 @@
-import { api } from 'omnikernel';
-import { unexpectedError } from './shared';
+import { FacadeUnit, manifest } from 'omnikernel';
+import { unexpectedError } from '@/shared';
 
-export default function Utilities(Kernel: Amoeba) {
-	Kernel._register({
-		utilities: {
-			round: api(round),
-			resizeCanvasForDPR: api(resizeCanvasForDPR),
-			applyStyles: api(applyStyles),
-			drawRoundRect: api(drawRoundRect),
-			getAnchorCoord: api(getAnchorCoord),
-			getColor: api(getColor)
-		},
-	});
+@manifest({ name: 'utilities' })
+export default class Utilities extends FacadeUnit {
+	constructor(...args: UnitArgs) {
+		super(...args);
+		this.Kernel.register(
+			{
+				round,
+				resizeCanvasForDPR,
+				applyStyles,
+				drawRoundRect,
+				getAnchorCoord,
+				getColor,
+			},
+			this.facade,
+		);
+	}
 }
 
 function applyStyles(container: HTMLElement, styleString: string) {
@@ -20,7 +25,14 @@ function applyStyles(container: HTMLElement, styleString: string) {
 	container.appendChild(style);
 }
 
-function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+function drawRoundRect(
+	ctx: CanvasRenderingContext2D,
+	x: number,
+	y: number,
+	width: number,
+	height: number,
+	radius: number,
+) {
 	ctx.beginPath();
 	ctx.moveTo(x + radius, y);
 	ctx.lineTo(x + width - radius, y);

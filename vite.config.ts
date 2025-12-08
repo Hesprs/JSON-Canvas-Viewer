@@ -1,49 +1,28 @@
-// @ts-nocheck
+import { resolve } from 'node:path';
+import decorators from '@open-xchange/vite-plugin-es-decorators';
 import { defineConfig } from 'vite';
-import { resolve } from 'path';
-import terser from '@rollup/plugin-terser';
-import { readdirSync, existsSync } from 'fs';
-
-// Auto-detect entry points from src directory
-const srcDir = resolve(__dirname, 'src', 'extensions');
-const extensions = readdirSync(srcDir, { withFileTypes: true })
-	.filter(entry => entry.isDirectory())
-	.map(dir => {
-		const indexPath = resolve(srcDir, dir.name, 'index.ts');
-		if (existsSync(indexPath)) return { [dir.name]: indexPath };
-		else return { [dir.name]: resolve(srcDir, dir.name) };
-	})
-	.reduce((entries, entry) => {
-		Object.assign(entries, entry);
-		return entries;
-	}, {} as Record<string, string>);
 
 export default defineConfig({
-	root: 'example',
+	root: 'test',
 	resolve: {
 		alias: {
 			'@': resolve(__dirname, 'src/'),
-			'$': resolve(__dirname, 'dist/es/'),
+			$: resolve(__dirname, 'dist/'),
 		},
 	},
+	plugins: [decorators()],
 	build: {
 		outDir: resolve(__dirname, 'dist'),
 		emptyOutDir: true,
-		minify: 'esbuild',
+		minify: 'terser',
+		sourcemap: true,
 		lib: {
 			entry: {
-				index: resolve(__dirname, 'src', 'main.ts'),
-				...extensions,
+				index: resolve(__dirname, 'src'),
 			},
-			name: 'canvasViewer',
+			name: 'JSONCanvasViewer',
 			formats: ['es', 'cjs'],
-		},
-		rollupOptions: {
-			external: ['marked'],
-			output: {
-				entryFileNames: '[format]/[name].js',
-				plugins: [terser()],
-			},
+			fileName: format => `index.${format === 'cjs' ? 'cjs' : 'js'}`,
 		},
 	},
 });

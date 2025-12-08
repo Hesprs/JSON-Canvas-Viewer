@@ -1,10 +1,16 @@
+import { FacadeUnit, Hook, manifest } from 'omnikernel';
+import type { Coordinates } from '@/declarations';
 import style from './styles.scss?inline';
-import { hook, api } from 'omnikernel';
 
-export default class Core {
+@manifest({
+	name: 'canvasViewer',
+	dependsOn: ['dataManager', 'utilities', 'options'],
+})
+export default class CanvasViewer extends FacadeUnit {
 	private animationId: null | number = null;
 	private resizeAnimationId: null | number = null;
-	private Kernel;
+	private utilities: Facade;
+	private dataManager: Facade;
 	private perFrame: {
 		lastScale: number;
 		lastOffsets: { x: number; y: number };
@@ -20,77 +26,97 @@ export default class Core {
 		y: null,
 	};
 
-	constructor(Kernel: Amoeba) {
-		Kernel._register({
-			data: {
-				container: document.createElement('div'),
+	constructor(...args: UnitArgs) {
+		super(...args);
+		this.Kernel.register(
+			{
+				refresh: this.refresh,
+				onRefresh: new Hook(),
+				onResize: new Hook(),
 			},
-			main: {
-				options: {
-					noShadow: false,
-				},
-				api: {
-					refresh: api(this.refresh),
-				},
+			this.facade,
+		);
+		this.dataManager = this.deps.dataManager;
+		this.utilities = this.deps.utilities;
+		this.Kernel.register(
+			{
 				hooks: {
-					onRefresh: hook(),
-					onResize: hook(),
-					onLoaded: this.onLoaded,
+					onCanvasFetched: { renderer: this.onFetched },
 				},
 			},
-			dispose: this.dispose,
-		});
-		this.Kernel = Kernel;
+			this.dataManager,
+		);
+		const options = this.deps.options;
+		this.Kernel.register({ options: { noShadow: false } }, options);
 
-		const parentContainer = Kernel.container();
+		const parentContainer = options.container() as HTMLElement;
 		while (parentContainer.firstElementChild) parentContainer.firstElementChild.remove();
 		parentContainer.innerHTML = '';
 
-		const realContainer = Kernel.main.options.noShadow() ? parentContainer : parentContainer.attachShadow({ mode: 'open' });
+		const realContainer = options.options.noShadow()
+			? parentContainer
+			: parentContainer.attachShadow({ mode: 'open' });
 
-		Kernel.utilities.applyStyles(realContainer, style);
+		this.utilities.applyStyles(realContainer, style);
 
-		const container = Kernel.data.container();
+		const container = this.dataManager.data.container() as HTMLDivElement;
 		container.classList.add('container');
 		realContainer.appendChild(container);
-	};
-
-	private onLoaded = () => {
-		this.Kernel.main.api.resetView();
-		this.resizeObserver.observe(this.Kernel.data.container());
-		this.animationId = requestAnimationFrame(this.draw);
 	}
 
+	private onFetched = () => {
+		this.dataManager.api.resetView();
+		this.resizeObserver.observe(this.dataManager.data.container() as HTMLDivElement);
+		this.animationId = requestAnimationFrame(this.draw);
+	};
+
 	private draw = () => {
-		if (this.perFrame.lastScale !== this.Kernel.data.scale() || this.perFrame.lastOffsets.x !== this.Kernel.data.offsetX() || this.perFrame.lastOffsets.y !== this.Kernel.data.offsetY()) this.refresh();
+		if (
+			this.perFrame.lastScale !== this.dataManager.data.scale() ||
+			this.perFrame.lastOffsets.x !== this.dataManager.data.offsetX() ||
+			this.perFrame.lastOffsets.y !== this.dataManager.data.offsetY()
+		)
+			this.refresh();
 		this.animationId = requestAnimationFrame(this.draw);
 	};
 
 	private refresh = () => {
-		this.perFrame.lastScale = this.Kernel.data.scale();
-		this.perFrame.lastOffsets = { x: this.Kernel.data.offsetX(), y: this.Kernel.data.offsetY() };
-		this.Kernel.main.hooks.onRefresh();
+		this.perFrame.lastScale = this.dataManager.data.scale() as number;
+		this.perFrame.lastOffsets = {
+			x: this.dataManager.data.offsetX(),
+			y: this.dataManager.data.offsetY(),
+		} as Coordinates;
+		this.facade.onRefresh();
 	};
 
 	private onResize = () => {
 		this.resizeAnimationId = requestAnimationFrame(() => {
-			const center = this.Kernel.utilities.middleViewer();
+			const center = this.dataManager.utilities.middleViewer() as Coordinates & {
+				width: number;
+				height: number;
+			};
 			if (this.lastResizeCenter.x && this.lastResizeCenter.y) {
-				this.Kernel.data.offsetX(this.Kernel.data.offsetX() + center.x - this.lastResizeCenter.x);
-				this.Kernel.data.offsetY(this.Kernel.data.offsetY() + center.y - this.lastResizeCenter.y);
+				this.dataManager.data.offsetX(
+					(this.dataManager.data.offsetX() as number) + center.x - this.lastResizeCenter.x,
+				);
+				this.dataManager.data.offsetY(
+					(this.dataManager.data.offsetY() as number) + center.y - this.lastResizeCenter.y,
+				);
 			}
 			this.lastResizeCenter.x = center.x;
 			this.lastResizeCenter.y = center.y;
-			this.Kernel.main.hooks.onResize(center.width, center.height);
+			this.facade.onResize(center.width, center.height);
 			this.refresh();
 		});
 	};
 	private resizeObserver: ResizeObserver = new ResizeObserver(this.onResize);
 
-	dispose() {
+	dispose = () => {
 		if (this.animationId) cancelAnimationFrame(this.animationId);
 		if (this.resizeAnimationId) cancelAnimationFrame(this.resizeAnimationId);
 		this.resizeObserver.disconnect();
-		this.Kernel.data.container().remove();
-	}
+		(this.dataManager.data.container() as HTMLDivElement).remove();
+		while ((this.deps.options.container() as HTMLElement).firstChild)
+			(this.deps.options.container() as HTMLElement).firstChild?.remove();
+	};
 }
