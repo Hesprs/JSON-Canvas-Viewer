@@ -58,12 +58,7 @@ export default class DataManager extends FacadeUnit {
 		if (!this.deps.options.canvasPath) throw new Error('[JSONCanvasViewer] Canvas path not provided.');
 		const path = this.deps.options.canvasPath() as string;
 		try {
-			if (/^https?:\/\//.test(path))
-				this.facade.data.canvasBaseDir(path.substring(0, path.lastIndexOf('/') + 1));
-			else {
-				const lastSlash = path.lastIndexOf('/');
-				this.facade.data.canvasBaseDir(lastSlash !== -1 ? path.substring(0, lastSlash + 1) : './');
-			}
+			this.resolvePath(path);
 			this.facade.data.canvasData(await fetch(path).then(res => res.json()));
 			(this.facade.data.canvasData() as JSONCanvas).nodes.forEach((node: JSONCanvasNode) => {
 				if (node.type === 'file' && node.file && !node.file.includes('http')) {
@@ -77,6 +72,15 @@ export default class DataManager extends FacadeUnit {
 			this.facade.hooks.onCanvasFetched();
 		} catch (err) {
 			console.error('Failed to load canvas data:', err);
+		}
+	};
+
+	private resolvePath = (path: string) => {
+		if (/^https?:\/\//.test(path))
+			this.facade.data.canvasBaseDir(path.substring(0, path.lastIndexOf('/') + 1));
+		else {
+			const lastSlash = path.lastIndexOf('/');
+			this.facade.data.canvasBaseDir(lastSlash !== -1 ? path.substring(0, lastSlash + 1) : './');
 		}
 	};
 
