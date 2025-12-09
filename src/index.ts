@@ -30,6 +30,7 @@ export class JSONCanvasViewer {
 	}
 
 	dispose = () => this.Kernel.shutDown();
+	getUnits = () => this.Kernel.getRunningUnits();
 
 	private makeOptions(options: Record<string, unknown>) {
 		return @manifest({ name: 'options' })

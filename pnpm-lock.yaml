@@ -28,8 +28,8 @@ importers:
         specifier: ^5.1.6
         version: 5.1.6(katex@0.16.27)(marked@17.0.1)
       omnikernel:
-        specifier: file:src/omnikernel-0.3.1.tgz
-        version: file:src/omnikernel-0.3.1.tgz
+        specifier: file:src/omnikernel-0.3.2.tgz
+        version: file:src/omnikernel-0.3.2.tgz
       sass:
         specifier: ^1.94.2
         version: 1.94.2
@@ -822,9 +822,9 @@ packages:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
     engines: {node: '>=0.10.0'}
 
-  omnikernel@file:src/omnikernel-0.3.1.tgz:
-    resolution: {integrity: sha512-BpNiY3NfUnf32K2Ml+ek9CqJjUp3g7f0bKe1KLYWMbrkhwGDHN3d178J33zCWL0OnsJ3NrKJrjpOtQ1s/Fz8iw==, tarball: file:src/omnikernel-0.3.1.tgz}
-    version: 0.3.1
+  omnikernel@file:src/omnikernel-0.3.2.tgz:
+    resolution: {integrity: sha512-KHigGrNi/n6CnR8nM5SD1FN+drAyOUE6G1N9dTyVHvFhB9y9FEHWu2zVve7Eg65HgU3YWcxieLlP6fMauwDGTw==, tarball: file:src/omnikernel-0.3.2.tgz}
+    version: 0.3.2
 
   path-type@4.0.0:
     resolution: {integrity: sha512-gDKb8aZMDeD/tZWs9P6+q0J9Mwkdl6xMV8TjnGP3qJVJ06bdMgkbBlLU8IdfOsIsFz2BW1rNVT3XuNEl8zPAvw==}
@@ -1647,7 +1647,7 @@ snapshots:
 
   normalize-path@3.0.0: {}
 
-  omnikernel@file:src/omnikernel-0.3.1.tgz: {}
+  omnikernel@file:src/omnikernel-0.3.2.tgz: {}
 
   path-type@4.0.0: {}
 
