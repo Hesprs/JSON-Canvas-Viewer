@@ -1,12 +1,13 @@
-import { FacadeUnit, manifest } from 'omnikernel';
+import { manifest, OmniUnit } from 'omnikernel';
 import { destroyError } from '@/shared';
+import type { controlsArgs } from '../../omniTypes';
 import style from './styles.scss?inline';
 
 @manifest({
 	name: 'controls',
 	dependsOn: ['canvasViewer', 'dataManager', 'utilities', 'renderer', 'overlayManager'],
 })
-export default class Controls extends FacadeUnit {
+export default class Controls extends OmniUnit<controlsArgs> {
 	private _controlsPanel: HTMLDivElement | null = null;
 	private _toggleCollapseBtn: HTMLButtonElement | null = null;
 	private _toggleFullscreenBtn: HTMLButtonElement | null = null;
@@ -14,7 +15,7 @@ export default class Controls extends FacadeUnit {
 	private _zoomSlider: HTMLInputElement | null = null;
 	private _zoomInBtn: HTMLButtonElement | null = null;
 	private _resetViewBtn: HTMLButtonElement | null = null;
-	private dataManager: Facade;
+	private dataManager: typeof this.deps.dataManager;
 
 	private get controlsPanel() {
 		if (this._controlsPanel === null) throw destroyError;
@@ -45,7 +46,7 @@ export default class Controls extends FacadeUnit {
 		return this._resetViewBtn;
 	}
 
-	constructor(...args: UnitArgs) {
+	constructor(...args: controlsArgs) {
 		super(...args);
 		this.Kernel.register(
 			{
@@ -67,7 +68,7 @@ export default class Controls extends FacadeUnit {
 
 		this._controlsPanel = document.createElement('div');
 		this._controlsPanel.className = 'controls';
-		this._controlsPanel.classList.toggle('collapsed', this.facade.collapsed() as boolean);
+		this._controlsPanel.classList.toggle('collapsed', this.facade.collapsed());
 
 		this.deps.utilities.applyStyles(this._controlsPanel, style);
 
@@ -109,7 +110,7 @@ export default class Controls extends FacadeUnit {
 
 		this._controlsPanel.appendChild(controlsContent);
 
-		(this.dataManager.data.container() as HTMLElement).appendChild(this._controlsPanel);
+		this.dataManager.data.container().appendChild(this._controlsPanel);
 
 		this._toggleCollapseBtn.addEventListener('click', this.toggleCollapse);
 		this._zoomInBtn.addEventListener('click', this.zoomIn);
@@ -136,7 +137,7 @@ export default class Controls extends FacadeUnit {
 	private toggleFullscreen = () => this.dataManager.api.shiftFullscreen('toggle');
 
 	private updateSlider = () => {
-		this.zoomSlider.value = String(this.scaleToSlider(this.dataManager.data.scale() as number));
+		this.zoomSlider.value = String(this.scaleToSlider(this.dataManager.data.scale()));
 	};
 	private scaleToSlider = (scale: number) => Math.log(scale) / Math.log(1.1);
 
@@ -146,7 +147,7 @@ export default class Controls extends FacadeUnit {
 		this.zoomOutBtn.removeEventListener('click', this.zoomOut);
 		this.zoomSlider.removeEventListener('input', this.slide);
 		this.resetViewBtn.removeEventListener('click', this.dataManager.api.resetView);
-		this.toggleFullscreenBtn.removeEventListener('click', this.dataManager.api.shiftFullscreen);
+		this.toggleFullscreenBtn.removeEventListener('click', this.toggleFullscreen);
 		this.controlsPanel.remove();
 		this._controlsPanel = null;
 		this._toggleCollapseBtn = null;

@@ -1,13 +1,13 @@
-import { FacadeUnit, manifest, Reactive } from 'omnikernel';
-import type { ColorOutput, NodeBounds } from '@/declarations';
+import { manifest, OmniUnit, Reactive } from 'omnikernel';
 import { destroyError } from '@/shared';
+import type { minimapArgs } from '../../omniTypes';
 import style from './styles.scss?inline';
 
 @manifest({
 	name: 'minimap',
 	dependsOn: ['dataManager', 'canvasViewer', 'renderer', 'overlayManager', 'utilities'],
 })
-export default class Minimap extends FacadeUnit {
+export default class Minimap extends OmniUnit<minimapArgs> {
 	private _minimapCtx: CanvasRenderingContext2D | null = null;
 	private _viewportRectangle: HTMLDivElement | null = null;
 	private _minimap: HTMLDivElement | null = null;
@@ -18,8 +18,8 @@ export default class Minimap extends FacadeUnit {
 		centerX: 0,
 		centerY: 0,
 	};
-	private dataManager: Facade;
-	private utilities: Facade;
+	private dataManager: typeof this.deps.dataManager;
+	private utilities: typeof this.deps.utilities;
 
 	private get minimap() {
 		if (this._minimap === null) throw destroyError;
@@ -42,7 +42,7 @@ export default class Minimap extends FacadeUnit {
 		return this._toggleMinimapBtn;
 	}
 
-	constructor(...args: UnitArgs) {
+	constructor(...args: minimapArgs) {
 		super(...args);
 		this.Kernel.register(
 			{
@@ -85,9 +85,9 @@ export default class Minimap extends FacadeUnit {
 		this._minimap.appendChild(this._viewportRectangle);
 		this._minimapContainer.appendChild(this._minimap);
 
-		(this.dataManager.data.container() as HTMLDivElement).appendChild(this._minimapContainer);
+		this.dataManager.data.container().appendChild(this._minimapContainer);
 
-		this._minimapContainer.classList.toggle('collapsed', this.facade.collapsed() as boolean);
+		this._minimapContainer.classList.toggle('collapsed', this.facade.collapsed());
 
 		this._toggleMinimapBtn.addEventListener('click', this.toggleCollapseButton);
 		this.deps.utilities.resizeCanvasForDPR(minimapCanvas, minimapCanvas.width, minimapCanvas.height);
@@ -104,7 +104,7 @@ export default class Minimap extends FacadeUnit {
 	};
 
 	private drawMinimap = () => {
-		const bounds = this.dataManager.data.nodeBounds() as NodeBounds;
+		const bounds = this.dataManager.data.nodeBounds();
 		if (!bounds) return;
 		const displayWidth = this.minimap.clientWidth;
 		const displayHeight = this.minimap.clientHeight;
@@ -118,14 +118,14 @@ export default class Minimap extends FacadeUnit {
 		this.minimapCtx.translate(this.minimapCache.centerX, this.minimapCache.centerY);
 		this.minimapCtx.scale(this.minimapCache.scale, this.minimapCache.scale);
 		this.minimapCtx.translate(-bounds.centerX, -bounds.centerY);
-		const canvasData = this.dataManager.data.canvasData() as JSONCanvas;
+		const canvasData = this.dataManager.data.canvasData();
 		for (const edge of canvasData.edges) this.drawMinimapEdge(edge);
 		for (const node of canvasData.nodes) this.drawMinimapNode(node);
 		this.minimapCtx.restore();
 	};
 
 	private drawMinimapNode = (node: JSONCanvasNode) => {
-		const colors = this.utilities.getColor(node.color) as ColorOutput;
+		const colors = this.utilities.getColor(node.color);
 		const radius = 25;
 		this.minimapCtx.fillStyle = colors.border;
 		this.minimapCtx.globalAlpha = 0.3;
@@ -135,12 +135,12 @@ export default class Minimap extends FacadeUnit {
 	};
 
 	private drawMinimapEdge = (edge: JSONCanvasEdge) => {
-		const nodeMap = this.dataManager.data.nodeMap() as Record<string, JSONCanvasNode>;
+		const nodeMap = this.dataManager.data.nodeMap();
 		const fromNode = nodeMap[edge.fromNode];
 		const toNode = nodeMap[edge.toNode];
 		if (!fromNode || !toNode) return;
-		const [startX, startY] = this.utilities.getAnchorCoord(fromNode, edge.fromSide) as [number, number];
-		const [endX, endY] = this.utilities.getAnchorCoord(toNode, edge.toSide) as [number, number];
+		const [startX, startY] = this.utilities.getAnchorCoord(fromNode, edge.fromSide);
+		const [endX, endY] = this.utilities.getAnchorCoord(toNode, edge.toSide);
 		this.minimapCtx.beginPath();
 		this.minimapCtx.moveTo(startX, startY);
 		this.minimapCtx.lineTo(endX, endY);
@@ -151,16 +151,16 @@ export default class Minimap extends FacadeUnit {
 
 	private updateViewportRectangle = () => {
 		if (this.facade.collapsed()) return;
-		const bounds = this.dataManager.data.nodeBounds() as NodeBounds;
-		const container = this.dataManager.data.container() as HTMLDivElement;
-		const scale = this.dataManager.data.scale() as number;
+		const bounds = this.dataManager.data.nodeBounds();
+		const container = this.dataManager.data.container();
+		const scale = this.dataManager.data.scale();
 		if (!bounds) return;
 		const viewWidth = container.clientWidth / scale;
 		const viewHeight = container.clientHeight / scale;
 		const viewportCenterX =
-			-(this.dataManager.data.offsetX() as number) / scale + container.clientWidth / (2 * scale);
+			-this.dataManager.data.offsetX() / scale + container.clientWidth / (2 * scale);
 		const viewportCenterY =
-			-(this.dataManager.data.offsetY() as number) / scale + container.clientHeight / (2 * scale);
+			-this.dataManager.data.offsetY() / scale + container.clientHeight / (2 * scale);
 		const viewRectX =
 			this.minimapCache.centerX +
 			(viewportCenterX - viewWidth / 2 - bounds.centerX) * this.minimapCache.scale;

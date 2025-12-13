@@ -1,10 +1,11 @@
-import { FacadeUnit, manifest, OmniKernel, Reactive } from 'omnikernel';
+import { manifest, OmniKernel, OmniUnit, Reactive, type Store } from 'omnikernel';
 import CanvasViewer from '@/canvasViewer';
 import DataManager from '@/dataManager';
 import InteractionHandler from '@/interactionHandler';
 import OverlayManager from '@/overlayManager';
 import Renderer from '@/renderer';
 import Utilities from '@/utilities';
+import type { optionsArgs } from '../omniTypes';
 
 export { default as Controls } from '@/controls';
 export { default as DebugPanel } from '@/debugPanel';
@@ -34,14 +35,14 @@ export class JSONCanvasViewer {
 
 	private makeOptions(options: Record<string, unknown>) {
 		return @manifest({ name: 'options' })
-		class Options extends FacadeUnit {
-			constructor(...args: UnitArgs) {
+		class Options extends OmniUnit<optionsArgs> {
+			constructor(...args: optionsArgs) {
 				super(...args);
 				this.Kernel.register(
 					{
-						container: undefined,
-						canvasPath: new Reactive(undefined),
-						markdownParser: undefined,
+						container: undefined as unknown as HTMLElement,
+						canvasPath: new Reactive(undefined as unknown as string),
+						markdownParser: undefined as unknown as Store<(input: string) => Promise<string>>,
 					},
 					this.facade,
 				);

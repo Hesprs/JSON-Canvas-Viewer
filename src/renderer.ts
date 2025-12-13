@@ -1,6 +1,6 @@
-import { FacadeUnit, manifest } from 'omnikernel';
-import type { ColorOutput } from '@/declarations';
+import { manifest, OmniUnit } from 'omnikernel';
 import { destroyError, unexpectedError } from '@/shared';
+import type { rendererArgs } from '../omniTypes';
 
 interface viewport {
 	left: number;
@@ -23,11 +23,11 @@ const CSS_ZOOM_REDRAW_INTERVAL = 500;
 	name: 'renderer',
 	dependsOn: ['dataManager', 'canvasViewer', 'utilities'],
 })
-export default class Renderer extends FacadeUnit {
+export default class Renderer extends OmniUnit<rendererArgs> {
 	private _canvas: HTMLCanvasElement | null;
 	private ctx: CanvasRenderingContext2D;
-	private dataManager: Facade;
-	private utilities: Facade;
+	private dataManager: typeof this.deps.dataManager;
+	private utilities: typeof this.deps.utilities;
 	private zoomInOptimize: {
 		lastDrawnScale: number;
 		lastDrawnViewport: viewport;
@@ -50,7 +50,7 @@ export default class Renderer extends FacadeUnit {
 		return this._canvas;
 	}
 
-	constructor(...args: UnitArgs) {
+	constructor(...args: rendererArgs) {
 		super(...args);
 		this.Kernel.register(
 			{
@@ -64,11 +64,11 @@ export default class Renderer extends FacadeUnit {
 		this._canvas = document.createElement('canvas');
 		this._canvas.className = 'main-canvas';
 		this.ctx = this._canvas.getContext('2d') as CanvasRenderingContext2D;
-		(this.dataManager.data.container() as HTMLDivElement).appendChild(this._canvas);
+		this.dataManager.data.container().appendChild(this._canvas);
 	}
 
 	private optimizeDPR = () => {
-		const container = this.dataManager.data.container() as HTMLDivElement;
+		const container = this.dataManager.data.container();
 		this.utilities.resizeCanvasForDPR(this.canvas, container.offsetWidth, container.offsetHeight);
 	};
 
@@ -78,9 +78,9 @@ export default class Renderer extends FacadeUnit {
 			this.zoomInOptimize.timeout = null;
 		}
 		const now = Date.now();
-		const offsetX = this.dataManager.data.offsetX() as number;
-		const offsetY = this.dataManager.data.offsetY() as number;
-		const scale = this.dataManager.data.scale() as number;
+		const offsetX = this.dataManager.data.offsetX();
+		const offsetY = this.dataManager.data.offsetY();
+		const scale = this.dataManager.data.scale();
 		const currentViewport = this.getCurrentViewport(offsetX, offsetY, scale);
 		if (
 			this.isViewportInside(currentViewport, this.zoomInOptimize.lastDrawnViewport) &&
@@ -109,7 +109,7 @@ export default class Renderer extends FacadeUnit {
 		this.ctx.save();
 		this.ctx.translate(offsetX, offsetY);
 		this.ctx.scale(scale, scale);
-		const canvasData = this.dataManager.data.canvasData() as JSONCanvas;
+		const canvasData = this.dataManager.data.canvasData();
 		canvasData.nodes.forEach(node => {
 			switch (node.type) {
 				case 'group':
@@ -142,7 +142,7 @@ export default class Renderer extends FacadeUnit {
 	private getCurrentViewport = (offsetX: number, offsetY: number, scale: number) => {
 		const left = -offsetX / scale;
 		const top = -offsetY / scale;
-		const container = this.dataManager.data.container() as HTMLDivElement;
+		const container = this.dataManager.data.container();
 		const right = left + container.clientWidth / scale;
 		const bottom = top + container.clientHeight / scale;
 		return { left, top, right, bottom };
@@ -179,7 +179,7 @@ export default class Renderer extends FacadeUnit {
 	};
 
 	private drawNodeBackground = (node: JSONCanvasNode) => {
-		const colors = this.utilities.getColor(node.color) as ColorOutput;
+		const colors = this.utilities.getColor(node.color);
 		const radius = NODE_RADIUS;
 		this.ctx.globalAlpha = 1.0;
 		this.ctx.fillStyle = colors.background;
@@ -201,13 +201,7 @@ export default class Renderer extends FacadeUnit {
 	private drawGroup = (node: JSONCanvasNode, scale: number) => {
 		this.drawNodeBackground(node);
 		if (node.label)
-			this.drawLabelBar(
-				node.x,
-				node.y,
-				node.label,
-				(this.utilities.getColor(node.color) as ColorOutput).border,
-				scale,
-			);
+			this.drawLabelBar(node.x, node.y, node.label, this.utilities.getColor(node.color).border, scale);
 	};
 
 	private drawFileNode = (node: JSONCanvasNode) => {
@@ -221,8 +215,8 @@ export default class Renderer extends FacadeUnit {
 		const { fromNode, toNode } = this.getEdgeNodes(edge);
 		if (!fromNode || !toNode) throw unexpectedError;
 		const gac = this.utilities.getAnchorCoord;
-		const [startX, startY] = gac(fromNode, edge.fromSide) as [number, number];
-		const [endX, endY] = gac(toNode, edge.toSide) as [number, number];
+		const [startX, startY] = gac(fromNode, edge.fromSide);
+		const [endX, endY] = gac(toNode, edge.toSide);
 		let [startControlX, startControlY, endControlX, endControlY] = [0, 0, 0, 0];
 		if (!edge.controlPoints) {
 			[startControlX, startControlY, endControlX, endControlY] = this.getControlPoints(
@@ -284,8 +278,8 @@ export default class Renderer extends FacadeUnit {
 	};
 
 	private getEdgeNodes = (edge: JSONCanvasEdge) => ({
-		fromNode: (this.dataManager.data.nodeMap() as Record<string, JSONCanvasNode>)[edge.fromNode],
-		toNode: (this.dataManager.data.nodeMap() as Record<string, JSONCanvasNode>)[edge.toNode],
+		fromNode: this.dataManager.data.nodeMap()[edge.fromNode],
+		toNode: this.dataManager.data.nodeMap()[edge.toNode],
 	});
 
 	private getControlPoints = (

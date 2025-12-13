@@ -1,21 +1,22 @@
-import { FacadeUnit, manifest } from 'omnikernel';
+import { manifest, OmniUnit } from 'omnikernel';
 import { destroyError } from '@/shared';
+import type { debugPanelArgs } from '../../omniTypes';
 import style from './styles.scss?inline';
 
 @manifest({
 	name: 'debugPanel',
 	dependsOn: ['canvasViewer', 'dataManager', 'utilities', 'renderer', 'overlayManager'],
 })
-export default class DebugPanel extends FacadeUnit {
+export default class DebugPanel extends OmniUnit<debugPanelArgs> {
 	private _debugPanel: HTMLDivElement | null = null;
-	private dataManager: Facade;
+	private dataManager: typeof this.deps.dataManager;
 
 	private get debugPanel() {
 		if (!this._debugPanel) throw destroyError;
 		return this._debugPanel;
 	}
 
-	constructor(...args: UnitArgs) {
+	constructor(...args: debugPanelArgs) {
 		super(...args);
 		this.Kernel.register({ update: this.update }, this.facade);
 		this.Kernel.register(
@@ -27,7 +28,7 @@ export default class DebugPanel extends FacadeUnit {
 		this.dataManager = this.deps.dataManager;
 		this._debugPanel = document.createElement('div');
 		this._debugPanel.className = 'debug-panel';
-		const container = this.dataManager.data.container() as HTMLElement;
+		const container = this.dataManager.data.container();
 		this.deps.utilities.applyStyles(container, style);
 		container.appendChild(this._debugPanel);
 	}

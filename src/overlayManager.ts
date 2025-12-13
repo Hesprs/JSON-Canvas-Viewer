@@ -1,28 +1,28 @@
 import Purify from 'dompurify';
-import { FacadeUnit, Hook, manifest } from 'omnikernel';
-import type { ColorOutput } from '@/declarations';
+import { Hook, manifest, OmniUnit } from 'omnikernel';
 import { destroyError, type RuntimeJSONCanvasNode, unexpectedError } from '@/shared';
+import type { overlayManagerArgs } from '../omniTypes';
 
 @manifest({
 	name: 'overlayManager',
 	dependsOn: ['dataManager', 'canvasViewer', 'utilities', 'renderer', 'options'],
 	requires: ['interactionHandler'],
 })
-export default class OverlayManager extends FacadeUnit {
+export default class OverlayManager extends OmniUnit<overlayManagerArgs> {
 	private _overlaysLayer: HTMLDivElement | null = document.createElement('div');
 	private overlays: Record<string, HTMLDivElement> = {}; // { id: node } the overlays in viewport
 	private selectedId: string | null = null;
 	private eventListeners: Record<string, Array<EventListener | null>> = {};
-	private dataManager: Facade;
-	private utilities: Facade;
-	private parser: (content: string) => Promise<string>;
+	private dataManager: typeof this.deps.dataManager;
+	private utilities: typeof this.deps.utilities;
+	private parser: (input: string) => Promise<string>;
 
 	private get overlaysLayer() {
 		if (!this._overlaysLayer) throw destroyError;
 		return this._overlaysLayer;
 	}
 
-	constructor(...args: UnitArgs) {
+	constructor(...args: overlayManagerArgs) {
 		super(...args);
 		this.Kernel.register(
 			{
@@ -33,7 +33,7 @@ export default class OverlayManager extends FacadeUnit {
 		);
 		this.dataManager = this.deps.dataManager;
 		this.utilities = this.deps.utilities;
-		this.parser = this.deps.options.markdownParser() as typeof this.parser;
+		this.parser = this.deps.options.markdownParser();
 		if (!this.parser) throw new Error('[JSONCanvasViewer] Markdown parser is not provided.');
 		this.Kernel.register(
 			{ hooks: { onCanvasFetched: { overlayManager: this.onFetched } } },
@@ -44,7 +44,7 @@ export default class OverlayManager extends FacadeUnit {
 
 		this._overlaysLayer = document.createElement('div');
 		this._overlaysLayer.className = 'overlays';
-		(this.dataManager.data.container() as HTMLElement).appendChild(this.overlaysLayer);
+		this.dataManager.data.container().appendChild(this.overlaysLayer);
 	}
 
 	private onFetched = () => {
@@ -68,11 +68,9 @@ export default class OverlayManager extends FacadeUnit {
 			},
 			group: () => {},
 		};
-		Object.values(this.dataManager.data.nodeMap() as Record<string, RuntimeJSONCanvasNode>).forEach(
-			node => {
-				overlayCreators[node.type](node);
-			},
-		);
+		Object.values(this.dataManager.data.nodeMap()).forEach(node => {
+			overlayCreators[node.type](node);
+		});
 	};
 
 	private select = (id: string | null) => {
@@ -141,7 +139,7 @@ export default class OverlayManager extends FacadeUnit {
 	}
 
 	private async constructOverlay(node: RuntimeJSONCanvasNode, content: string, type: string) {
-		const color = this.utilities.getColor(node.color) as ColorOutput;
+		const color = this.utilities.getColor(node.color);
 		const overlay = document.createElement('div');
 		overlay.classList.add('overlay-container');
 		overlay.id = node.id;

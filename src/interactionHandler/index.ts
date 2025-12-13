@@ -1,12 +1,13 @@
-import { FacadeUnit, Hook, manifest } from 'omnikernel';
+import { Hook, manifest, OmniUnit } from 'omnikernel';
+import type { interactionHandlerArgs } from '../../omniTypes';
 import interactor from './interactor';
 
 @manifest({ name: 'interactionHandler', dependsOn: ['dataManager', 'overlayManager', 'options'] })
-export default class InteractionHandler extends FacadeUnit {
+export default class InteractionHandler extends OmniUnit<interactionHandlerArgs> {
 	private interactor: interactor;
-	private dataManager: Facade;
+	private dataManager: typeof this.deps.dataManager;
 
-	constructor(...args: UnitArgs) {
+	constructor(...args: interactionHandlerArgs) {
 		super(...args);
 		this.Kernel.register({ onClick: new Hook() }, this.facade);
 		const options = this.deps.options;
@@ -25,7 +26,7 @@ export default class InteractionHandler extends FacadeUnit {
 		);
 		this.dataManager = this.deps.dataManager;
 		this.interactor = new interactor(
-			this.dataManager.data.container() as HTMLDivElement,
+			this.dataManager.data.container(),
 			this.Kernel.normalize(options.options.interactions) as Record<string, unknown>,
 		);
 		this.Kernel.register(
@@ -75,7 +76,7 @@ export default class InteractionHandler extends FacadeUnit {
 		}
 		if (e instanceof CustomEvent) {
 			if (isUIControl(e.detail.target)) return;
-			const node = this.dataManager.utilities.findNodeAt(e.detail.position) as JSONCanvasNode;
+			const node = this.dataManager.utilities.findNodeAt(e.detail.position);
 			this.facade.onClick(node ? node.id : null);
 		}
 	};

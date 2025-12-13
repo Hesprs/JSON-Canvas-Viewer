@@ -3,7 +3,7 @@
 	"version": "4.0.0",
 	"description": "An extensible TypeScript-based viewer for JSON Canvas, easy to embed into websites.",
 	"type": "module",
-	"types": "dist/types/canvasViewer.d.ts",
+	"types": "dist/types/src/index.d.ts",
 	"main": "dist/index.cjs",
 	"module": "dist/index.js",
 	"repository": {
@@ -27,7 +27,7 @@
 		"@types/node": "^24.10.1",
 		"marked": "^17.0.1",
 		"marked-katex-extension": "^5.1.6",
-		"omnikernel": "file:src/omnikernel-0.3.2.tgz",
+		"omnikernel": "file:src/omnikernel-1.0.0-alpha.tgz",
 		"sass": "^1.94.2",
 		"tsc-alias": "^1.8.16",
 		"typescript": "^5.9.3",

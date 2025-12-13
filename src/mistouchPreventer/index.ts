@@ -1,4 +1,4 @@
-import { FacadeUnit, manifest, Reactive, Runner } from 'omnikernel';
+import { manifest, OmniUnit, Reactive, Runner } from 'omnikernel';
 import { destroyError } from '@/shared';
 import style from './styles.scss?inline';
 
@@ -6,7 +6,7 @@ import style from './styles.scss?inline';
 	name: 'mistouchPreventer',
 	dependsOn: ['dataManager', 'utilities', 'renderer', 'overlayManager'],
 })
-export default class MistouchPreventer extends FacadeUnit {
+export default class MistouchPreventer extends OmniUnit<UnitArgs> {
 	private _preventionContainer: HTMLDivElement | null = null;
 	private _preventionBanner: HTMLDivElement | null = null;
 	private preventMt: boolean = false;
