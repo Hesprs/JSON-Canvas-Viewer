@@ -14,13 +14,7 @@
 	"bugs": {
 		"url": "https://github.com/hesprs/json-canvas-viewer/issues"
 	},
-	"keywords": [
-		"obsidian",
-		"JSONCanvas",
-		"front-end",
-		"HTMLCanvas",
-		"TypeScript"
-	],
+	"keywords": ["obsidian", "JSONCanvas", "front-end", "HTMLCanvas", "TypeScript"],
 	"author": {
 		"name": "Hēsperus",
 		"email": "hesprs@outlook.com"
@@ -47,9 +41,7 @@
 			"optional": true
 		}
 	},
-	"files": [
-		"dist"
-	],
+	"files": ["dist"],
 	"scripts": {
 		"dev": "vite",
 		"lint": "biome check --write",
