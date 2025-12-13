@@ -1,9 +1,10 @@
-import { FacadeUnit, manifest } from 'omnikernel';
+import { manifest, OmniUnit } from 'omnikernel';
 import { unexpectedError } from '@/shared';
+import type { utilitiesArgs } from '../omniTypes';
 
 @manifest({ name: 'utilities' })
-export default class Utilities extends FacadeUnit {
-	constructor(...args: UnitArgs) {
+export default class Utilities extends OmniUnit<utilitiesArgs> {
+	constructor(...args: utilitiesArgs) {
 		super(...args);
 		this.Kernel.register(
 			{
@@ -19,13 +20,13 @@ export default class Utilities extends FacadeUnit {
 	}
 }
 
-function applyStyles(container: HTMLElement, styleString: string) {
+export function applyStyles(container: HTMLElement | ShadowRoot, styleString: string) {
 	const style = document.createElement('style');
 	style.innerHTML = styleString;
 	container.appendChild(style);
 }
 
-function drawRoundRect(
+export function drawRoundRect(
 	ctx: CanvasRenderingContext2D,
 	x: number,
 	y: number,
@@ -46,7 +47,7 @@ function drawRoundRect(
 	ctx.closePath();
 }
 
-function getAnchorCoord(node: JSONCanvasNode, side: 'top' | 'bottom' | 'left' | 'right') {
+export function getAnchorCoord(node: JSONCanvasNode, side: 'top' | 'bottom' | 'left' | 'right') {
 	const midX = node.x + node.width / 2;
 	const midY = node.y + node.height / 2;
 	switch (side) {
@@ -63,7 +64,7 @@ function getAnchorCoord(node: JSONCanvasNode, side: 'top' | 'bottom' | 'left' | 
 	}
 }
 
-function getColor(colorIndex: string = '0') {
+export function getColor(colorIndex: string = '0') {
 	let themeColor = null;
 
 	function hexToRgb(hex: string) {
@@ -108,7 +109,7 @@ function getColor(colorIndex: string = '0') {
 	};
 }
 
-function resizeCanvasForDPR(canvas: HTMLCanvasElement, width: number, height: number) {
+export function resizeCanvasForDPR(canvas: HTMLCanvasElement, width: number, height: number) {
 	const dpr = window.devicePixelRatio || 1;
 	const ctx = canvas.getContext('2d');
 	if (!ctx) throw unexpectedError;
@@ -118,7 +119,7 @@ function resizeCanvasForDPR(canvas: HTMLCanvasElement, width: number, height: nu
 	ctx.scale(dpr, dpr);
 }
 
-function round(roundedNum: number, digits: number) {
+export function round(roundedNum: number, digits: number) {
 	const factor = 10 ** digits;
 	return Math.round(roundedNum * factor) / factor;
 }

@@ -3,6 +3,9 @@ node_modules
 # dot files
 .vscode
 
+# generated files
+omniTypes.ts
+
 # Logs
 logs
 *.log

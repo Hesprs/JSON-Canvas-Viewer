@@ -19,6 +19,6 @@
 			"$": ["./src"]
 		}
 	},
-	"include": ["src/**/*", "test/**/*"],
+	"include": ["src/**/*", "test/**/*", "omniTypes"],
 	"exclude": ["node_modules", "./dist"]
 }

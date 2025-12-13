@@ -70,9 +70,3 @@ export type NodeBounds = {
 	centerX: number;
 	centerY: number;
 };
-
-export type ColorOutput = {
-	background: string;
-	active: string;
-	border: string;
-};

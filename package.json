@@ -14,7 +14,13 @@
 	"bugs": {
 		"url": "https://github.com/hesprs/json-canvas-viewer/issues"
 	},
-	"keywords": ["obsidian", "JSONCanvas", "front-end", "HTMLCanvas", "TypeScript"],
+	"keywords": [
+		"obsidian",
+		"JSONCanvas",
+		"front-end",
+		"HTMLCanvas",
+		"TypeScript"
+	],
 	"author": {
 		"name": "Hēsperus",
 		"email": "hesprs@outlook.com"
@@ -27,7 +33,7 @@
 		"@types/node": "^24.10.1",
 		"marked": "^17.0.1",
 		"marked-katex-extension": "^5.1.6",
-		"omnikernel": "file:src/omnikernel-0.3.2.tgz",
+		"omnikernel": "file:src/omnikernel-1.0.0-alpha.tgz",
 		"sass": "^1.94.2",
 		"tsc-alias": "^1.8.16",
 		"typescript": "^5.9.3",
@@ -41,7 +47,9 @@
 			"optional": true
 		}
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"scripts": {
 		"dev": "vite",
 		"lint": "biome check --write",

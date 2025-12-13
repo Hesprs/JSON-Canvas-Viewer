@@ -1,16 +1,16 @@
-import { FacadeUnit, Hook, manifest } from 'omnikernel';
-import type { Coordinates } from '@/declarations';
+import { Hook, manifest, OmniUnit } from 'omnikernel';
+import type { canvasViewerArgs } from '../omniTypes';
 import style from './styles.scss?inline';
 
 @manifest({
 	name: 'canvasViewer',
 	dependsOn: ['dataManager', 'utilities', 'options'],
 })
-export default class CanvasViewer extends FacadeUnit {
+export default class CanvasViewer extends OmniUnit<canvasViewerArgs> {
 	private animationId: null | number = null;
 	private resizeAnimationId: null | number = null;
-	private utilities: Facade;
-	private dataManager: Facade;
+	private utilities: typeof this.deps.utilities;
+	private dataManager: typeof this.deps.dataManager;
 	private perFrame: {
 		lastScale: number;
 		lastOffsets: { x: number; y: number };
@@ -26,7 +26,7 @@ export default class CanvasViewer extends FacadeUnit {
 		y: null,
 	};
 
-	constructor(...args: UnitArgs) {
+	constructor(...args: canvasViewerArgs) {
 		super(...args);
 		this.Kernel.register(
 			{
@@ -49,7 +49,7 @@ export default class CanvasViewer extends FacadeUnit {
 		const options = this.deps.options;
 		this.Kernel.register({ options: { noShadow: false } }, options);
 
-		const parentContainer = options.container() as HTMLElement;
+		const parentContainer = options.container();
 		while (parentContainer.firstElementChild) parentContainer.firstElementChild.remove();
 		parentContainer.innerHTML = '';
 
@@ -59,14 +59,14 @@ export default class CanvasViewer extends FacadeUnit {
 
 		this.utilities.applyStyles(realContainer, style);
 
-		const container = this.dataManager.data.container() as HTMLDivElement;
+		const container = this.dataManager.data.container();
 		container.classList.add('container');
 		realContainer.appendChild(container);
 	}
 
 	private onFetched = () => {
 		this.dataManager.api.resetView();
-		this.resizeObserver.observe(this.dataManager.data.container() as HTMLDivElement);
+		this.resizeObserver.observe(this.dataManager.data.container());
 		this.animationId = requestAnimationFrame(this.draw);
 	};
 
@@ -81,26 +81,23 @@ export default class CanvasViewer extends FacadeUnit {
 	};
 
 	private refresh = () => {
-		this.perFrame.lastScale = this.dataManager.data.scale() as number;
+		this.perFrame.lastScale = this.dataManager.data.scale();
 		this.perFrame.lastOffsets = {
 			x: this.dataManager.data.offsetX(),
 			y: this.dataManager.data.offsetY(),
-		} as Coordinates;
+		};
 		this.facade.onRefresh();
 	};
 
 	private onResize = () => {
 		this.resizeAnimationId = requestAnimationFrame(() => {
-			const center = this.dataManager.utilities.middleViewer() as Coordinates & {
-				width: number;
-				height: number;
-			};
+			const center = this.dataManager.utilities.middleViewer();
 			if (this.lastResizeCenter.x && this.lastResizeCenter.y) {
 				this.dataManager.data.offsetX(
-					(this.dataManager.data.offsetX() as number) + center.x - this.lastResizeCenter.x,
+					this.dataManager.data.offsetX() + center.x - this.lastResizeCenter.x,
 				);
 				this.dataManager.data.offsetY(
-					(this.dataManager.data.offsetY() as number) + center.y - this.lastResizeCenter.y,
+					this.dataManager.data.offsetY() + center.y - this.lastResizeCenter.y,
 				);
 			}
 			this.lastResizeCenter.x = center.x;
@@ -115,8 +112,7 @@ export default class CanvasViewer extends FacadeUnit {
 		if (this.animationId) cancelAnimationFrame(this.animationId);
 		if (this.resizeAnimationId) cancelAnimationFrame(this.resizeAnimationId);
 		this.resizeObserver.disconnect();
-		(this.dataManager.data.container() as HTMLDivElement).remove();
-		while ((this.deps.options.container() as HTMLElement).firstChild)
-			(this.deps.options.container() as HTMLElement).firstChild?.remove();
+		this.dataManager.data.container().remove();
+		while (this.deps.options.container().firstChild) this.deps.options.container().firstChild?.remove();
 	};
 }
