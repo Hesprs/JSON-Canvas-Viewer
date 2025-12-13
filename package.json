@@ -3,7 +3,7 @@
 	"version": "4.0.0",
 	"description": "An extensible TypeScript-based viewer for JSON Canvas, easy to embed into websites.",
 	"type": "module",
-	"types": "dist/types/canvasViewer.d.ts",
+	"types": "dist/types/src/index.d.ts",
 	"main": "dist/index.cjs",
 	"module": "dist/index.js",
 	"repository": {
